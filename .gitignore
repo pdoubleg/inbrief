@@ -1,0 +1,4 @@
+src/__pycache__/
+src/graphs/__pycache__/
+src/graphs/supporting_docs_graph.cpython-311.pyc
+src/graphs/exhibits_graph.cpython-311.pyc
