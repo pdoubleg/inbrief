@@ -1,31 +1,11 @@
 import asyncio
-from typing import List, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from pydantic_ai.usage import Usage
 from pydantic_ai.models.openai import OpenAIModel
 
 from utils import count_tokens
-
-
-# Define the model for discovery summary results
-class DiscoverySummaryResult(BaseModel):
-    """Result of a discovery document summary task."""
-
-    summary: str = Field(
-        description="The detailed narrative summary of the discovery document"
-    )
-    usages: List[Usage] = Field(default_factory=list, description="Usage information")
-    reasoning_model_flag: bool = Field(
-        default=False, description="Whether the reasoning model was used"
-    )
-    reasoning_prompt_tokens: int = Field(
-        default=0, description="Number of prompt tokens used by reasoning model"
-    )
-    reasoning_completion_tokens: int = Field(
-        default=0, description="Number of completion tokens used by reasoning model"
-    )
+from models import DiscoverySummaryResult
 
 
 # System prompts for the discovery agents

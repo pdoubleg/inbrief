@@ -1,9 +1,3 @@
-"""
-Graph-based implementation of the supporting documents agent.
-
-This module provides a Pydantic-AI graph implementation for processing
-and summarizing legal discovery documents.
-"""
 from dataclasses import dataclass, field
 from typing import Dict, List, Union
 

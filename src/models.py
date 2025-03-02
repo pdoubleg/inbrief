@@ -206,3 +206,4 @@ class DiscoverySummaryResult(BaseModel):
     reasoning_completion_tokens: int = Field(
         default=0, description="Number of completion tokens used by reasoning model"
     )
+    
