@@ -2,14 +2,15 @@ import time
 import asyncio
 from typing import List, Tuple
 from pydantic_ai import Agent
+from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.usage import Usage
-from models import (
+from src.models import (
     ConversionResult,
     ContextSummary,
     ContextSummaries,
     TitleAndDescriptionResult,
 )
-from utils import prepare_processed_document_chunks, count_tokens
+from src.utils import prepare_processed_document_chunks, count_tokens
 
 
 DOCUMENT_SUMMARY_PROMPT = f"""\
@@ -28,7 +29,7 @@ You are a world class legal assistant AI. Summarize the context, which is a pack
 # PII Rules:
 
 * NEVER include a person's DOB, physical address, or phone number.
-* If possible, include the plaintiff's age as of {time.strftime('%B %d, %Y', time.localtime())}.
+* If possible, include the plaintiff's age as of {time.strftime("%B %d, %Y", time.localtime())}.
 * Include city and state of residence when possible. NEVER include the full address for people.
 
 # For medical related documents, include the following information:
@@ -152,8 +153,6 @@ TITLE_DESCRIPTION_PROMPT = """\
 """
 
 
-# Initialize agents using pydantic-ai
-
 document_summary_agent = Agent[str, str](
     model="openai:gpt-4o",
     result_type=str,
@@ -191,7 +190,7 @@ async def summarize_document(document: str) -> Tuple[str, Usage]:
     return result.data, result.usage()
 
 
-async def summarize_intermediate_excerpt(excerpt: str) -> str:
+async def summarize_intermediate_excerpt(excerpt: str) -> AgentRunResult:
     """Summarize an intermediate document excerpt."""
     result = await intermediate_summary_agent.run(excerpt)
     return result
@@ -250,7 +249,9 @@ async def consolidate_summaries(
         return result.data, usages
 
 
-async def generate_title_and_description(text: str) -> Tuple[TitleAndDescriptionResult, Usage]:
+async def generate_title_and_description(
+    text: str,
+) -> Tuple[TitleAndDescriptionResult, Usage]:
     """Generate a title and description for the provided text."""
     result = await title_description_agent.run(text)
     return result.data, result.usage()

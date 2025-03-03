@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.usage import Usage
 
-from models import (
+from src.models import (
     ConversionResult,
     EntityListing,
     FinalizedEntityListing,
@@ -14,7 +14,7 @@ from models import (
     ResolvedEntityListing,
     TextChunk,
 )
-from utils import prepare_processed_document_chunks
+from src.utils import prepare_processed_document_chunks
 
 ENTITY_EXTRACTOR_PROMPT = """\
 You are a world class legal assistant AI. Use the context to generate a list-like summary of ALL **medical providers** and \
@@ -287,7 +287,7 @@ entity_finalizer_agent = Agent[ProviderDeps, FinalizedEntityListing](
 async def validate_result(
     ctx: RunContext[ProviderDeps], result: FinalizedEntityListing
 ) -> FinalizedEntityListing:
-    qc_response = qc_agent.run(result.finalized_listing, usage=ctx.usage)
+    qc_response = await qc_agent.run(result.finalized_listing, usage=ctx.usage)
     if qc_response.data.score >= 8:
         return result
     else:

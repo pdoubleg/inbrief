@@ -1,10 +1,10 @@
 import asyncio
 import time
-from typing import Tuple
 
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.usage import Usage
+
+from src.models import ShortVersionResult
 
 
 def get_short_version_prompt(long_version: str) -> str:
@@ -118,17 +118,17 @@ short_version_exhibits_agent = Agent[str, str](
     system_prompt="You are a world class legal assistant AI.",
 )
 
-    
+
 @short_version_exhibits_agent.system_prompt
 async def add_instructions(ctx: RunContext[str]) -> str:  # noqa: F811
     return get_short_version_exhibits_prompt(draft_report=ctx.deps)
 
 
-def run_short_version(long_version: str) -> Tuple[str, Usage]:
-    result = asyncio.run(short_version_agent.run(long_version))
-    return result.data, result.usage()
+def run_short_version(long_version: str) -> ShortVersionResult:
+    result = asyncio.run(short_version_agent.run(deps=long_version))
+    return ShortVersionResult(summary=result.data, usages=result.usage())
 
 
-def run_short_version_exhibits(draft_report: str) -> Tuple[str, Usage]:
-    result = asyncio.run(short_version_exhibits_agent.run(draft_report))
-    return result.data, result.usage()
+def run_short_version_exhibits(draft_report: str) -> ShortVersionResult:
+    result = asyncio.run(short_version_exhibits_agent.run(deps=draft_report))
+    return ShortVersionResult(summary=result.data, usages=result.usage())

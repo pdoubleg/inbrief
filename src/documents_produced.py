@@ -1,7 +1,5 @@
-from typing import Tuple
 from pydantic_ai import Agent
-from pydantic_ai.usage import Usage
-from models import ContextSummaries
+from src.models import ContextSummaries, DocumentsProducedResult
 
 
 # Define the prompt (keeping the original from DocumentsProduced)
@@ -35,32 +33,36 @@ documents_produced_agent = Agent[str, str](
     system_prompt=DOCUMENTS_PRODUCED_PROMPT,
 )
 
-async def generate_documents_produced_summary(discovery_documents: str) -> Tuple[str, Usage]:
+
+async def generate_documents_produced_summary(
+    discovery_documents: str,
+) -> DocumentsProducedResult:
     """
     Generate a summary of documents produced from discovery documents.
-    
+
     Args:
         discovery_documents: String containing information about discovery documents
-        
+
     Returns:
         A tuple containing the documents produced summary and usage information
     """
     result = await documents_produced_agent.run(discovery_documents)
-    return result.data, result.usage()
+    return DocumentsProducedResult(summary=result.data, usages=result.usage())
 
-def run_documents_produced_report(input_context: ContextSummaries) -> Tuple[str, Usage]:
+
+def run_documents_produced_report(
+    input_context: ContextSummaries,
+) -> DocumentsProducedResult:
     """
     Synchronous wrapper to generate a documents produced report.
-    
+
     Args:
         input_context: ContextSummaries object containing summaries of discovery documents
-        
+
     Returns:
         String summary of documents produced
     """
     import asyncio
-    
-    docs_info = input_context.docs_info_string(number=False)
-    result, usage = asyncio.run(generate_documents_produced_summary(docs_info))
-    return result, usage
 
+    docs_info = input_context.docs_info_string(number=False)
+    return asyncio.run(generate_documents_produced_summary(docs_info))

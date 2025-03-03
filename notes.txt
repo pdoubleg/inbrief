@@ -11,3 +11,10 @@ uv pip freeze > requirements.txt
 uvx ruff
 
 uv run --with jupyter jupyter lab
+
+uv pip install -e ".[dev]"  # Install dev dependencies
+uv run pytest               # Run the tests
+
+uv run pytest --cov=inbrief
+
+uv run pytest --cov=inbrief --cov-report=html --cov-report=term-missing

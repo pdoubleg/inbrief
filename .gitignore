@@ -2,3 +2,8 @@ src/__pycache__/
 src/graphs/__pycache__/
 src/graphs/supporting_docs_graph.cpython-311.pyc
 src/graphs/exhibits_graph.cpython-311.pyc
+tests/__pycache__/
+tests/test_discovery_summary.cpython-311-pytest-8.3.5.pyc
+*.pyc
+src/inbrief.egg-info/dependency_links.txt
+src/inbrief.egg-info/

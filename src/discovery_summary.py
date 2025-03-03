@@ -4,8 +4,8 @@ from typing import Optional
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 
-from utils import count_tokens
-from models import DiscoverySummaryResult
+from src.utils import count_tokens
+from src.models import DiscoverySummaryResult
 
 
 # System prompts for the discovery agents

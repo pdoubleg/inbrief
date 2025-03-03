@@ -1,0 +1,10 @@
+.venv
+.gitignore
+notes.txt
+*.log
+*.log.*
+*.log.*.*
+*.log.*.*.*
+*.log.*.*.*.*
+*.log.*.*.*.*.*
+uv.lock

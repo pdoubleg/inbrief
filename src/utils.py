@@ -4,7 +4,7 @@ from typing import List, Union
 import logging
 import traceback
 
-from models import Page, TextChunk, ProcessedDocument, ConversionResult
+from src.models import Page, TextChunk, ProcessedDocument, ConversionResult
 
 # Configure logging
 logging.basicConfig(
@@ -246,6 +246,7 @@ def log_exception(
     error_message: str = None,
     error_category: str = None,
     error_traceback: str = None,
+    module: str = None,
 ) -> None:
     """
     Log an exception to logger and optionally to a monitoring system.

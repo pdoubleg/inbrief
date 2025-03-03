@@ -12,6 +12,7 @@ class ConversionResult(BaseModel):
     text_trimmed: str = Field(description="Trimmed text content of the document")
     page_text: str = Field(description="Text content organized by pages")
     pages: List = Field(description="List of Page objects containing text")
+    token_count: int = Field(default=0, description="The token count of the document")
 
 
 class Page(BaseModel):
@@ -53,6 +54,7 @@ class ContextSummary(BaseModel):
     document_title: Optional[str] = Field(
         default=None, description="Title of the document"
     )
+    usages: List[Usage] = Field(default_factory=list, description="Usage information")
 
     def __str__(self) -> str:
         """String representation of the context summary."""
@@ -206,4 +208,32 @@ class DiscoverySummaryResult(BaseModel):
     reasoning_completion_tokens: int = Field(
         default=0, description="Number of completion tokens used by reasoning model"
     )
-    
+
+
+class SummaryResult(BaseModel):
+    """Result model for the entire summarization process."""
+
+    long_version: str = Field(description="The detailed long version summary.")
+    short_version: str = Field(description="The condensed short version summary.")
+    cost: float = Field(description="The total cost of the summarization process.")
+    processing_time: float = Field(description="The total processing time in seconds.")
+    error: Optional[str] = Field(
+        default=None, description="Error message if the summarization process failed."
+    )
+    usages: List[Usage] = Field(
+        default_factory=list, description="The usages of the summarization process."
+    )
+
+
+class ShortVersionResult(BaseModel):
+    """Result of a short version generation task."""
+
+    summary: str = Field(description="The condensed short version summary.")
+    usages: Optional[Usage] = Field(None, description="Usage information")
+
+
+class DocumentsProducedResult(BaseModel):
+    """Result of a documents produced generation task."""
+
+    summary: str = Field(description="The summary of the documents produced.")
+    usages: Optional[Usage] = Field(None, description="Usage information")

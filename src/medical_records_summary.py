@@ -5,12 +5,12 @@ from pydantic_ai import Agent
 from pydantic_ai.usage import Usage
 from pydantic_ai.models.openai import OpenAIModel
 
-from models import (
+from src.models import (
     ConversionResult,
     MedicalRecordsSummaryResult,
     TitleAndDescriptionResult,
 )
-from utils import prepare_processed_document_chunks, count_tokens
+from src.utils import prepare_processed_document_chunks, count_tokens
 
 
 # System prompts for agents

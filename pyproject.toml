@@ -5,12 +5,50 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "dirty-equals>=0.9.0",
     "ipykernel>=6.29.5",
     "openai>=1.65.2",
     "pydantic>=2.10.6",
     "pydantic-ai-slim[openai]>=0.0.30",
     "pydantic-graph>=0.0.30",
     "pydantic-settings>=2.8.1",
+    "pytest-asyncio>=0.25.3",
     "python-dotenv>=1.0.1",
     "tiktoken>=0.9.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+    "ruff>=0.9.9",
+    "pytest-cov>=4.1.0",
+]
+
+[tool.pytest.ini_options]
+# Directories that contain test files
+testpaths = ["tests"]
+# Additional command line options
+addopts = [
+    "--verbose",
+    "--color=yes",
+    "--durations=5",
+    "--asyncio-mode=auto"
+]
+# Test file patterns to discover
+python_files = ["test_*.py", "*_test.py"]
+# Enable asyncio support for pytest
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["inbrief"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
 ]

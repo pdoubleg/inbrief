@@ -6,7 +6,7 @@ from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.usage import Usage
 
 
-from models import (
+from src.models import (
     ContextSummaries,
     ExhibitsResearchItem,
     ExhibitsResearchNotNeeded,
