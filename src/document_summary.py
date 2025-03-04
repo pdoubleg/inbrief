@@ -195,6 +195,11 @@ async def summarize_intermediate_excerpt(excerpt: str) -> AgentRunResult:
     result = await intermediate_summary_agent.run(excerpt)
     return result
 
+async def generate_title_and_description(summary: str) -> Tuple[str, Usage]:
+    """Get a title and description for a summary."""
+    result = await title_description_agent.run(summary)
+    return result.data, result.usage()
+
 
 async def consolidate_summaries(
     intermediate_summaries: List[str],
@@ -249,14 +254,6 @@ async def consolidate_summaries(
         return result.data, usages
 
 
-async def generate_title_and_description(
-    text: str,
-) -> Tuple[TitleAndDescriptionResult, Usage]:
-    """Generate a title and description for the provided text."""
-    result = await title_description_agent.run(text)
-    return result.data, result.usage()
-
-
 # Main summarization workflow
 
 
@@ -300,9 +297,9 @@ async def process_discovery_document(
     # Optionally generate title and description
     title, description = "", ""
     if add_labels:
-        labels, usage = await generate_title_and_description(summary)
-        title, description = labels.title, labels.description
-        usages_list.append(usage)
+        result = await title_description_agent.run(summary)
+        title, description = result.data.title, result.data.description
+        usages_list.append(result.usage())
 
     return {
         "document_name": input_document.name,

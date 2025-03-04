@@ -148,6 +148,7 @@ class TitleAndDescriptionResult(BaseModel):
 
     title: str = Field(description="The title of the text")
     description: str = Field(description="The description of the text")
+    usages: List[Usage] = Field(default_factory=list, description="Usage information")
 
 
 class EntityListing(BaseModel):

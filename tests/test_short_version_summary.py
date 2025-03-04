@@ -163,11 +163,9 @@ Back to Health Clinic, 1234 Main St, Kent, WA 98032, Phone: (253) 555-0123"""
             request_tokens=100, response_tokens=50, total_tokens=150
         )
 
-        # Test the agent
-        with patch.object(short_version_agent, "run", return_value=mock_result):
-            result = await short_version_agent.run(deps=mock_long_version)
-            assert isinstance(result.data, str)
-            assert result.usage().total_tokens > 0
+        result = await short_version_agent.run(user_prompt=mock_long_version)
+        assert isinstance(result.data, str)
+        assert result.usage().total_tokens > 0
 
     @pytest.mark.asyncio
     async def test_short_version_exhibits_agent(
@@ -187,13 +185,9 @@ Back to Health Clinic, 1234 Main St, Kent, WA 98032, Phone: (253) 555-0123"""
             request_tokens=100, response_tokens=50, total_tokens=150
         )
 
-        # Test the agent
-        with patch.object(
-            short_version_exhibits_agent, "run", return_value=mock_result
-        ):
-            result = await short_version_exhibits_agent.run(deps=mock_exhibits_draft)
-            assert isinstance(result.data, str)
-            assert result.usage().total_tokens > 0
+        result = await short_version_exhibits_agent.run(user_prompt=mock_exhibits_draft)
+        assert isinstance(result.data, str)
+        assert result.usage().total_tokens > 0
 
     def test_run_short_version(self, mock_long_version, setup_test_models):
         """

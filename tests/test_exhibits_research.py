@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
 from unittest.mock import patch, MagicMock
+import unittest.mock
 from typing import List, Union
 
 from pydantic_ai import models, ModelRetry
@@ -147,7 +148,9 @@ class TestExhibitsResearch:
         )
 
         # Act
-        with patch.object(issue_finder_agent, "run", return_value=mock_result):
+        # Properly patch the run method with an AsyncMock that returns a coroutine
+        issue_finder_agent_run_mock = unittest.mock.AsyncMock(return_value=mock_result)
+        with patch.object(issue_finder_agent, "run", issue_finder_agent_run_mock):
             result = await issue_finder_agent.run(primary_doc, deps=mock_research_deps)
 
         # Assert

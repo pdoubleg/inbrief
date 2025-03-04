@@ -80,7 +80,7 @@ def handle_llm_errors(
 
     This decorator catches exceptions, logs them, and returns a default value
     constructed from the function's annotated return type (which must be a subclass of BaseModel
-    or a string).
+    or a string) with additional attributes for `error_message` and `traceback`.
 
     Args:
         task_name: Name of the task being performed (for logging).
