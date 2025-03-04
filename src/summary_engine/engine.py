@@ -32,7 +32,6 @@ class SummaryEngine:
         supporting_docs: Supporting documents to be processed
         has_medical_records: Whether medical records are included
         job_id: Unique identifier for the current job
-        cache: Whether to cache LLM calls
         include_exhibits_research: Whether to include exhibits research
         _cost: Running total of the cost of LLM calls
     """
