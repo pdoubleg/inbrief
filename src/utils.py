@@ -90,7 +90,7 @@ def create_dynamic_text_chunks(
         ]
 
     # Get total tokens
-    all_pages = "\n\n".join([page.text.strip() for page in pages if not page.skipped])
+    all_pages = "\n\n".join([page.text.strip() for page in pages])
     total_tokens = count_tokens(all_pages)
 
     # If total tokens is less than max_chunk_size, return a single chunk
@@ -200,7 +200,7 @@ def prepare_processed_document_chunks(
 
     for doc in docs:
         chunks = create_dynamic_text_chunks(
-            pages=doc.pages,
+            pages=doc,
             max_chunk_size=chunk_size,
             cap_multiplier=cap_multiplier,
         )

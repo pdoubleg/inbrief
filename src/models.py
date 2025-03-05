@@ -1,18 +1,27 @@
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from pydantic_ai.usage import Usage
 
 
+class ProcessingType(str, Enum):
+    """Processing types supported by the engine."""
+    
+    PRIMARY_AND_SUPPORTING = "primary_and_supporting"
+    PRIMARY_ONLY = "primary_only"
+    SUPPORTING_ONLY = "supporting_only"
+    MEDICAL_ONLY = "medical_only"
+
 class ConversionResult(BaseModel):
     """Represents a converted document with its metadata and content."""
 
-    name: str = Field(description="The name of the document")
-    text: str = Field(description="The full text content of the document")
-    text_trimmed: str = Field(description="Trimmed text content of the document")
-    page_text: str = Field(description="Text content organized by pages")
-    pages: List = Field(description="List of Page objects containing text")
-    token_count: int = Field(default=0, description="The token count of the document")
+    name: Optional[str] = Field(default=None, description="The name of the document")
+    text: Optional[str] = Field(default=None, description="The full text content of the document") 
+    text_trimmed: Optional[str] = Field(default=None, description="Trimmed text content of the document")
+    page_text: Optional[str] = Field(default=None, description="Text content organized by pages")
+    pages: Optional[List] = Field(default=None, description="List of Page objects containing text")
+    token_count: Optional[int] = Field(default=0, description="The token count of the document")
 
 
 class Page(BaseModel):
@@ -177,7 +186,7 @@ class ProviderListingResult(BaseModel):
     resolved_listing: str = Field(
         description="The final resolved listing of providers and parties."
     )
-    usages: List[Usage] = Field(description="Usage information for the agents.")
+    usages: List[Usage] = Field(default_factory=list, description="Usage information for the agents.")
 
 
 class QCResult(BaseModel):
@@ -199,14 +208,14 @@ class DiscoverySummaryResult(BaseModel):
     summary: str = Field(
         description="The detailed narrative summary of the discovery document"
     )
-    usages: List[Usage] = Field(default_factory=list, description="Usage information")
-    reasoning_model_flag: bool = Field(
+    usages: Optional[List[Usage]] = Field(default_factory=list, description="Usage information")
+    reasoning_model_flag: Optional[bool] = Field(
         default=False, description="Whether the reasoning model was used"
     )
-    reasoning_prompt_tokens: int = Field(
+    reasoning_prompt_tokens: Optional[int] = Field(
         default=0, description="Number of prompt tokens used by reasoning model"
     )
-    reasoning_completion_tokens: int = Field(
+    reasoning_completion_tokens: Optional[int] = Field(
         default=0, description="Number of completion tokens used by reasoning model"
     )
 
@@ -214,10 +223,18 @@ class DiscoverySummaryResult(BaseModel):
 class SummaryResult(BaseModel):
     """Result model for the entire summarization process."""
 
-    long_version: str = Field(description="The detailed long version summary.")
-    short_version: str = Field(description="The condensed short version summary.")
-    cost: float = Field(description="The total cost of the summarization process.")
-    processing_time: float = Field(description="The total processing time in seconds.")
+    long_version: Optional[str] = Field(
+        default=None, description="The detailed long version summary."
+    )
+    short_version: Optional[str] = Field(
+        default=None, description="The condensed short version summary."
+    )
+    cost: Optional[float] = Field(
+        default=None, description="The total cost of the summarization process."
+    )
+    processing_time: Optional[float] = Field(
+        default=None, description="The total processing time in seconds."
+    )
     error: Optional[str] = Field(
         default=None, description="Error message if the summarization process failed."
     )

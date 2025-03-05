@@ -5,7 +5,7 @@ focused medical summaries.
 """
 
 import time
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, TYPE_CHECKING
 
 from src.models import (
     ConversionResult,
@@ -16,8 +16,11 @@ from src.models import (
 from src.medical_records_summary import run_medical_records_summary
 from src.providers_listing import run_provider_listings
 from src.summary_engine.error_handling import handle_llm_errors
+from src.summary_engine_v2.base import ProcessingStrategy
 
-from ..base import ProcessingStrategy
+# Use TYPE_CHECKING to avoid circular imports at runtime
+if TYPE_CHECKING:
+    from src.summary_engine_v2.context import ProcessingInput
 
 
 class MedicalOnlyStrategy(ProcessingStrategy):
@@ -38,8 +41,7 @@ class MedicalOnlyStrategy(ProcessingStrategy):
         ```
     """
     
-    @handle_llm_errors("process medical only", "medical_processing")
-    def process(self, document_data: Dict[str, Any]) -> SummaryResult:
+    def process(self, input_data: "ProcessingInput") -> SummaryResult:
         """Process medical records to generate a medical summary.
         
         This method implements the workflow for processing medical records:
@@ -47,11 +49,7 @@ class MedicalOnlyStrategy(ProcessingStrategy):
         2. Generate provider listings
         
         Args:
-            document_data: Dictionary with all necessary data for processing:
-                - primary_docs: List of medical record documents
-                - has_medical_records: Should be True for this strategy
-                - usage: Usage tracking object
-                - job_id: Job identifier
+            input_data: ProcessingInput object containing all necessary data for processing:
         
         Returns:
             SummaryResult: The complete medical summary result
@@ -59,24 +57,17 @@ class MedicalOnlyStrategy(ProcessingStrategy):
         Raises:
             ValueError: If medical records are missing or has_medical_records is False
         """
-        # Extract data from the document_data dictionary
-        primary_docs = document_data.get("primary_docs", [])
-        has_medical_records = document_data.get("has_medical_records", False)
-        job_id = document_data.get("job_id")
         
-        if not primary_docs:
-            raise ValueError("Medical records are required for this strategy")
-        
-        if not has_medical_records:
-            raise ValueError("has_medical_records must be True for medical only strategy")
+        supporting_docs = input_data.supporting_docs
+        job_id = input_data.job_id
         
         start_time = time.time()
         
         # Process the medical records
-        medical_summary_result = self.process_medical_records(primary_docs)
+        medical_summary_result = self.process_medical_records(supporting_docs)
         
         # Generate the provider listing
-        provider_listing_result = self.generate_providers_listing(primary_docs)
+        provider_listing_result = self.generate_providers_listing(supporting_docs)
         
         # Track processing time
         duration = time.time() - start_time
@@ -84,8 +75,8 @@ class MedicalOnlyStrategy(ProcessingStrategy):
         # Construct and return the final result
         return SummaryResult(
             doc_id=job_id or "",
-            provider_listing=provider_listing_result.provider_listing if provider_listing_result else "",
-            long_version=medical_summary_result.long_version,
+            provider_listing=provider_listing_result.resolved_listing if provider_listing_result else "",
+            long_version=medical_summary_result.summary,
             short_version="",  # No short version for medical only
             documents_produced="",  # No supporting documents to produce
             exhibits_research="",  # No exhibits research for medical only
@@ -112,7 +103,6 @@ class MedicalOnlyStrategy(ProcessingStrategy):
     @handle_llm_errors("generate providers listing", "document_processing")
     def generate_providers_listing(
         self,
-        primary_docs: Optional[List[ConversionResult]] = None,
         supporting_docs: Optional[List[ConversionResult]] = None,
     ) -> ProviderListingResult:
         """Generate a listing of all medical providers found in the documents.
@@ -120,11 +110,10 @@ class MedicalOnlyStrategy(ProcessingStrategy):
         This method focuses on extracting medical providers from the medical records.
         
         Args:
-            primary_docs: List of medical record documents
-            supporting_docs: Not used in this strategy
+            supporting_docs: List of medical record documents
             
         Returns:
             ProviderListingResult: Listing of all medical providers found
         """
         # For medical only, we ignore supporting_docs parameter
-        return run_provider_listings(primary_docs, None) 
+        return run_provider_listings(supporting_documents=supporting_docs) 

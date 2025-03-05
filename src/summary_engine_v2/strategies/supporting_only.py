@@ -1,11 +1,11 @@
 """Supporting Only Document Processing Strategy.
 
-This strategy processes only supporting documents to generate
-context summaries and document listings.
+This strategy processes only supporting documents without a primary document
+to generate context summaries and provider listings.
 """
 
 import time
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, TYPE_CHECKING
 
 from src.models import (
     ConversionResult,
@@ -21,14 +21,19 @@ from src.documents_produced import run_documents_produced_report
 from src.providers_listing import run_provider_listings
 from src.summary_engine.error_handling import handle_llm_errors
 
-from ..base import ProcessingStrategy
+from src.summary_engine_v2.base import ProcessingStrategy
+
+# Use TYPE_CHECKING to avoid circular imports at runtime
+if TYPE_CHECKING:
+    from src.summary_engine_v2.context import ProcessingInput
 
 
 class SupportingOnlyStrategy(ProcessingStrategy):
     """Strategy for processing only supporting documents.
     
-    This strategy focuses on analyzing supporting documents to generate
-    context summaries and document listings without requiring primary documents.
+    This strategy handles the workflow for processing only supporting documents
+    without a primary document. It's useful for generating context summaries
+    and provider listings from a set of supporting documents.
     
     Example:
         ```python
@@ -41,20 +46,17 @@ class SupportingOnlyStrategy(ProcessingStrategy):
         ```
     """
     
-    @handle_llm_errors("process supporting only", "document_processing")
-    def process(self, document_data: Dict[str, Any]) -> SummaryResult:
+    def process(self, input_data: "ProcessingInput") -> SummaryResult:
         """Process only supporting documents to generate summaries.
         
-        This method implements the workflow for processing supporting documents:
+        This method implements the workflow for processing only supporting documents:
         1. Process the supporting documents to generate context summaries
-        2. Generate a document produced string
-        3. Generate a short version of the summary
-        4. Generate provider listings
+        2. Generate a documents produced report
+        3. Generate provider listings
         
         Args:
-            document_data: Dictionary with all necessary data for processing:
+            input_data: ProcessingInput object containing all necessary data for processing:
                 - supporting_docs: List of supporting documents
-                - usage: Usage tracking object
                 - job_id: Job identifier
         
         Returns:
@@ -63,12 +65,9 @@ class SupportingOnlyStrategy(ProcessingStrategy):
         Raises:
             ValueError: If supporting documents are missing
         """
-        # Extract data from the document_data dictionary
-        supporting_docs = document_data.get("supporting_docs", [])
-        job_id = document_data.get("job_id")
         
-        if not supporting_docs:
-            raise ValueError("Supporting documents are required for this strategy")
+        supporting_docs = input_data.supporting_docs
+        job_id = input_data.job_id
         
         start_time = time.time()
         
@@ -133,20 +132,19 @@ class SupportingOnlyStrategy(ProcessingStrategy):
     @handle_llm_errors("generate providers listing", "document_processing")
     def generate_providers_listing(
         self,
-        primary_docs: Optional[List[ConversionResult]] = None,
         supporting_docs: Optional[List[ConversionResult]] = None,
     ) -> ProviderListingResult:
         """Generate a listing of all providers found in the supporting documents.
         
         Args:
-            primary_docs: Not used in this strategy
             supporting_docs: List of supporting documents
             
         Returns:
             ProviderListingResult: Listing of all providers found
         """
-        return run_provider_listings(None, supporting_docs)
+        return run_provider_listings(supporting_documents=supporting_docs)
     
+    @handle_llm_errors("generate draft report", "document_processing")
     def _generate_draft_report(self, context_summaries: ContextSummaries) -> str:
         """Generate a draft report from the context summaries.
         

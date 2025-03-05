@@ -5,7 +5,7 @@ comprehensive summaries with cross-references between document types.
 """
 
 import time
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 
 from src.models import (
     ConversionResult,
@@ -26,7 +26,11 @@ from src.providers_listing import run_provider_listings
 from src.utils import count_tokens
 from src.summary_engine.error_handling import handle_llm_errors
 
-from ..base import ProcessingStrategy
+from src.summary_engine_v2.base import ProcessingStrategy
+
+# Use TYPE_CHECKING to avoid circular imports at runtime
+if TYPE_CHECKING:
+    from src.summary_engine_v2.context import ProcessingInput
 
 # Constant for maximum tokens in a primary document
 MAX_SINGLE_PRIMARY_TOKENS = 40000
@@ -35,9 +39,9 @@ MAX_SINGLE_PRIMARY_TOKENS = 40000
 class PrimaryAndSupportingStrategy(ProcessingStrategy):
     """Strategy for processing both primary and supporting documents.
     
-    This strategy handles the complete workflow for processing both primary
-    and supporting documents, generating comprehensive summaries that
-    incorporate information from both document types.
+    This strategy handles the workflow for processing both primary
+    and supporting documents, generating summaries that incorporate information 
+    from both document types.
     
     Example:
         ```python
@@ -47,90 +51,140 @@ class PrimaryAndSupportingStrategy(ProcessingStrategy):
         ```
     """
     
-    @handle_llm_errors("process primary and supporting", "document_processing")
-    def process(self, document_data: Dict[str, Any]) -> SummaryResult:
-        """Process primary and supporting documents to generate a summary.
-        
-        This method implements the complete workflow for processing both
-        primary and supporting documents:
-        1. Process supporting documents
-        2. Process each primary document
-        3. Generate a high-level summary
-        4. Process exhibits research if requested
-        5. Generate a short version of the summary
-        6. Generate provider listings
-        7. Create the document produced string
+    def process(self, input_data: "ProcessingInput") -> SummaryResult:
+        """Process primary and supporting documents.
         
         Args:
-            document_data: Dictionary with all necessary data for processing:
-                - primary_docs: List of primary documents
-                - supporting_docs: List of supporting documents
-                - include_exhibits_research: Whether to include exhibits research
-                - usage: Usage tracking object
-                - job_id: Job identifier
-        
+            input_data: Validated processing input
+            
         Returns:
             SummaryResult: The complete summary result
-            
-        Raises:
-            ValueError: If required documents are missing
         """
-        # Extract data from the document_data dictionary
-        primary_docs = document_data.get("primary_docs", [])
-        supporting_docs = document_data.get("supporting_docs", [])
-        include_exhibits_research = document_data.get("include_exhibits_research", False)
-        usage = document_data.get("usage")
-        job_id = document_data.get("job_id")
         
-        if not primary_docs:
-            raise ValueError("Primary documents are required for this strategy")
+        primary_docs = input_data.primary_docs
+        supporting_docs = input_data.supporting_docs
+        include_exhibits_research = input_data.include_exhibits_research
+        has_medical_records = input_data.has_medical_records
         
         start_time = time.time()
+        usages = []
         
-        # Process supporting documents first
-        context_summaries = None
-        if supporting_docs:
-            context_summaries = self.process_supporting_documents(supporting_docs)
+        # Process supporting documents to get context
+        context_summaries = self.process_supporting_documents(supporting_docs)
+        
+        high_level_summaries = []
+        exhibits_research_results = []
         
         # Process each primary document
         for doc in primary_docs:
-            # Check if the document is too large and needs compression
-            doc_tokens = count_tokens(doc.content)
-            if doc_tokens > MAX_SINGLE_PRIMARY_TOKENS:
-                # Compress large primary documents
-                context_summaries = self.compress_primary_document(doc)
+            # Run exhibits research
+            exhibits_research_result = None
+            if include_exhibits_research:
+                exhibits_research_result = self._run_exhibits_research(doc, context_summaries)
+            
+            # If exhibits research was generated, combine with the initial summary, otherwise use the initial summary
+            if exhibits_research_result:
+                # Check if the primary document + its exhibits is too long, and if so, compress the primary document before combining it with exhibits
+                if count_tokens(doc.content + exhibits_research_result.exhibits_research) > MAX_SINGLE_PRIMARY_TOKENS:
+                    compressed_doc_context = self.compress_primary_document(doc)
+                    compressed_content = compressed_doc_context.summaries[0].summary if compressed_doc_context.summaries else ""
+                    if hasattr(compressed_doc_context.summaries[0], "usages"):
+                        usages.extend(compressed_doc_context.summaries[0].usages)
+                    
+                    summary_response = self.generate_high_level_summary(compressed_content, context_summaries.to_string() if context_summaries else "")
+                    high_level_summaries.append(summary_response.summary)
+                    if hasattr(summary_response, "usages"):
+                        usages.extend(summary_response.usages)
+                    
+                    exhibits_research = f"### {doc.name}\n\n{exhibits_research_result.exhibits_research}"
+                    exhibits_research_results.append(exhibits_research)
+                else:
+                    summary_response = self.generate_high_level_summary(doc.content, context_summaries.to_string() if context_summaries else "")
+                    high_level_summaries.append(summary_response.summary)
+                    if hasattr(summary_response, "usages"):
+                        usages.extend(summary_response.usages)
+                    
+                    exhibits_research = f"### {doc.name}\n\n{exhibits_research_result.exhibits_research}"
+                    exhibits_research_results.append(exhibits_research)
+            # If no exhibits research is needed, just use the initial summary
+            else:
+                # Check if the primary document is too long, and if so, compress it before summarizing
+                if count_tokens(doc.content) > MAX_SINGLE_PRIMARY_TOKENS:
+                    compressed_doc_context = self.compress_primary_document(doc)
+                    compressed_content = compressed_doc_context.summaries[0].summary if compressed_doc_context.summaries else ""
+                    if hasattr(compressed_doc_context.summaries[0], "usages"):
+                        usages.extend(compressed_doc_context.summaries[0].usages)
+                    
+                    summary_response = self.generate_high_level_summary(compressed_content)
+                    high_level_summaries.append(summary_response.summary)
+                    if hasattr(summary_response, "usages"):
+                        usages.extend(summary_response.usages)
+                else:
+                    summary_response = self.generate_high_level_summary(doc.content)
+                    high_level_summaries.append(summary_response.summary)
+                    if hasattr(summary_response, "usages"):
+                        usages.extend(summary_response.usages)
         
-        # Generate the discovery summary
-        discovery_summary_result = self._generate_discovery_summary(primary_docs, context_summaries)
+        # Process medical records if included
+        medical_summary = ""
+        if has_medical_records:
+            medical_summary_response = self.generate_medical_records_summary(primary_docs)
+            if hasattr(medical_summary_response, "usages"):
+                usages.extend(medical_summary_response.usages)
+            medical_summary = medical_summary_response.summary
         
-        # Process exhibits research if requested
-        exhibits_research_result = None
-        if include_exhibits_research and primary_docs:
-            exhibits_research_result = self._run_exhibits_research(primary_docs[0], context_summaries)
-        
-        # Generate the short version
-        short_version_result = self._generate_short_version(discovery_summary_result.long_version)
-        
-        # Generate the provider listing
-        provider_listing_result = self.generate_providers_listing(primary_docs, supporting_docs)
-        
-        # Generate the documents produced string
+        # Documents produced
         documents_produced_result = None
         if context_summaries:
             documents_produced_result = self.generate_document_produced_string(context_summaries)
+            if hasattr(documents_produced_result, "usages"):
+                usages.extend(documents_produced_result.usages)
         
-        # Track processing time
+        # Generate provider listings
+        provider_listing_result = self.generate_providers_listing(primary_docs, supporting_docs)
+        if hasattr(provider_listing_result, "usages"):
+            usages.extend(provider_listing_result.usages)
+        
+        # Construct the long version
+        long_version = ""
+        
+        for i, doc in enumerate(primary_docs):
+            long_version += f"{doc.name}\n\n"
+            if i < len(high_level_summaries):
+                long_version += f"{high_level_summaries[i]}\n\n"
+        
+        if has_medical_records:
+            long_version += f"{medical_summary}\n\n"
+        
+        if documents_produced_result:
+            long_version += f"Documents Produced:\n\n{documents_produced_result.documents_produced}\n\n"
+        
+        if provider_listing_result:
+            long_version += f"{provider_listing_result.provider_listing}\n\n"
+        
+        # Append exhibits research if available
+        if exhibits_research_results:
+            for exhibit_result in exhibits_research_results:
+                long_version += f"{exhibit_result}\n\n"
+        
+        # Generate short version
+        short_version_result = self._generate_short_version(long_version)
+        if hasattr(short_version_result, "usages"):
+            usages.extend(short_version_result.usages)
+        
+        # Calculate processing time
         duration = time.time() - start_time
         
         # Construct and return the final result
         return SummaryResult(
-            doc_id=job_id or "",
+            doc_id=input_data.job_id or "",
             provider_listing=provider_listing_result.provider_listing if provider_listing_result else "",
-            long_version=discovery_summary_result.long_version,
+            long_version=long_version,
             short_version=short_version_result.short_version if short_version_result else "",
             documents_produced=documents_produced_result.documents_produced if documents_produced_result else "",
-            exhibits_research=exhibits_research_result.exhibits_research if exhibits_research_result else "",
+            exhibits_research="\n\n".join(exhibits_research_results) if exhibits_research_results else "",
             processing_time=duration,
+            usages=usages
         )
     
     @handle_llm_errors("process supporting documents", "document_processing")
@@ -203,10 +257,28 @@ class PrimaryAndSupportingStrategy(ProcessingStrategy):
         """
         return run_provider_listings(primary_docs, supporting_docs)
     
+    @handle_llm_errors("run exhibits research", "exhibits_research")
+    def _run_exhibits_research(
+        self, doc: ConversionResult, context_summaries: Optional[ContextSummaries]
+    ) -> ExhibitsResearchResult:
+        """Run exhibits research on the documents.
+        
+        Args:
+            doc: The primary document to analyze
+            context_summaries: Summaries of context documents
+            
+        Returns:
+            ExhibitsResearchResult: Results of the exhibits research
+        """
+        return run_exhibits_research(doc, context_summaries)
+    
     def _generate_discovery_summary(
         self, primary_docs: List[ConversionResult], context_summaries: Optional[ContextSummaries]
     ) -> DiscoverySummaryResult:
         """Generate a discovery summary from primary documents and context.
+        
+        This is kept for backward compatibility but the main logic has been moved
+        to the process method for better alignment with the v1 implementation.
         
         Args:
             primary_docs: List of primary documents
@@ -227,21 +299,6 @@ class PrimaryAndSupportingStrategy(ProcessingStrategy):
         
         # Generate the high-level summary
         return self.generate_high_level_summary(discovery_document, supporting_documents)
-    
-    @handle_llm_errors("run exhibits research", "exhibits_research")
-    def _run_exhibits_research(
-        self, doc: ConversionResult, context_summaries: Optional[ContextSummaries]
-    ) -> ExhibitsResearchResult:
-        """Run exhibits research on the documents.
-        
-        Args:
-            doc: The primary document to analyze
-            context_summaries: Summaries of context documents
-            
-        Returns:
-            ExhibitsResearchResult: Results of the exhibits research
-        """
-        return run_exhibits_research(doc, context_summaries)
     
     @handle_llm_errors("generate short version", "document_processing")
     def _generate_short_version(self, long_version: str) -> ShortVersionResult:

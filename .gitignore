@@ -9,3 +9,10 @@ src/inbrief.egg-info/dependency_links.txt
 src/inbrief.egg-info/
 weather_agent_gradio.py
 .env
+data/dalle_output/DALLE3Pr_20250303_231452.jpeg
+data/dalle_output/DALLE3Pr_20250303_231643.jpeg
+data/dalle_output/DALLE3Pr_20250304_200733.jpeg
+data/dalle_output/DALLE3Pr_20250304_200838.jpeg
+data/dalle_output/DALLE3Pr_20250304_201038.jpeg
+data/dalle_output/Promptfo_20250304_000028.jpeg
+.sesskey

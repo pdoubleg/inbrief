@@ -373,7 +373,7 @@ async def generate_provider_listings(
     # Process supporting documents if provided
     if supporting_documents is not None:
         supporting_chunks = prepare_processed_document_chunks(
-            supporting_documents, chunk_size=chunk_size, cap_multiplier=1
+            [supporting_documents], chunk_size=chunk_size, cap_multiplier=1
         )
 
         # Process chunks in parallel

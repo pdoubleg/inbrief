@@ -5,7 +5,7 @@ supporting documents to generate summaries.
 """
 
 import time
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, TYPE_CHECKING
 
 from src.models import (
     ConversionResult,
@@ -20,7 +20,11 @@ from src.providers_listing import run_provider_listings
 from src.utils import count_tokens
 from src.summary_engine.error_handling import handle_llm_errors
 
-from ..base import ProcessingStrategy
+from src.summary_engine_v2.base import ProcessingStrategy
+
+# Use TYPE_CHECKING to avoid circular imports at runtime
+if TYPE_CHECKING:
+    from src.summary_engine_v2.context import ProcessingInput
 
 # Constant for maximum tokens in a primary document
 MAX_SINGLE_PRIMARY_TOKENS = 30000
@@ -41,8 +45,7 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
         ```
     """
     
-    @handle_llm_errors("process primary only", "document_processing")
-    def process(self, document_data: Dict[str, Any]) -> SummaryResult:
+    def process(self, input_data: "ProcessingInput") -> SummaryResult:
         """Process only primary documents to generate a summary.
         
         This method implements the workflow for processing only primary documents:
@@ -52,9 +55,8 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
         4. Generate provider listings
         
         Args:
-            document_data: Dictionary with all necessary data for processing:
+            input_data: ProcessingInput object containing all necessary data for processing:
                 - primary_docs: List of primary documents
-                - usage: Usage tracking object
                 - job_id: Job identifier
         
         Returns:
@@ -63,12 +65,9 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
         Raises:
             ValueError: If primary documents are missing
         """
-        # Extract data from the document_data dictionary
-        primary_docs = document_data.get("primary_docs", [])
-        job_id = document_data.get("job_id")
         
-        if not primary_docs:
-            raise ValueError("Primary documents are required for this strategy")
+        primary_docs = input_data.primary_docs
+        job_id = input_data.job_id
         
         start_time = time.time()
         
@@ -76,7 +75,7 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
         discovery_summary_result = self._generate_discovery_summary(primary_docs)
         
         # Generate the short version
-        short_version_result = self._generate_short_version(discovery_summary_result.long_version)
+        short_version_result = self._generate_short_version(discovery_summary_result.summary)
         
         # Generate the provider listing
         provider_listing_result = self.generate_providers_listing(primary_docs)
@@ -87,9 +86,9 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
         # Construct and return the final result
         return SummaryResult(
             doc_id=job_id or "",
-            provider_listing=provider_listing_result.provider_listing if provider_listing_result else "",
-            long_version=discovery_summary_result.long_version,
-            short_version=short_version_result.short_version if short_version_result else "",
+            provider_listing=provider_listing_result.resolved_listing if provider_listing_result else "",
+            long_version=discovery_summary_result.summary,
+            short_version=short_version_result.summary if short_version_result else "",
             documents_produced="",  # No supporting documents to produce
             exhibits_research="",  # No exhibits research without supporting documents
             processing_time=duration,
@@ -115,13 +114,11 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
     def generate_providers_listing(
         self,
         primary_docs: Optional[List[ConversionResult]] = None,
-        supporting_docs: Optional[List[ConversionResult]] = None,
     ) -> ProviderListingResult:
         """Generate a listing of all providers found in the primary documents.
-        
+    
         Args:
             primary_docs: List of primary documents
-            supporting_docs: Not used in this strategy
             
         Returns:
             ProviderListingResult: Listing of all providers found
@@ -129,6 +126,7 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
         # For primary only, we ignore supporting_docs parameter
         return run_provider_listings(primary_docs, None)
     
+    @handle_llm_errors("generate discovery summary", "document_processing")
     def _generate_discovery_summary(
         self, primary_docs: List[ConversionResult]
     ) -> DiscoverySummaryResult:
@@ -141,13 +139,13 @@ class PrimaryOnlyStrategy(ProcessingStrategy):
             DiscoverySummaryResult: The discovery summary
         """
         # Check if the document is too large
-        doc_tokens = count_tokens(primary_docs[0].content)
+        doc_tokens = count_tokens(primary_docs[0].text)
         if doc_tokens > MAX_SINGLE_PRIMARY_TOKENS:
             print(f"Warning: Primary document exceeds token limit ({doc_tokens} > {MAX_SINGLE_PRIMARY_TOKENS})")
             # Processing continues with truncation handled by the LLM
         
         # Extract the primary document content
-        discovery_document = primary_docs[0].content
+        discovery_document = primary_docs[0].text
         
         # Generate the high-level summary (without supporting documents)
         return self.generate_high_level_summary(discovery_document)
