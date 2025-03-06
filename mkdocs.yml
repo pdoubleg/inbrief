@@ -1,0 +1,8 @@
+site_name: My Project Documentation
+nav:
+  - Home: index.md
+  - About: about.md
+theme: material
+plugins:
+- mkdocstrings:
+    default_handler: python
