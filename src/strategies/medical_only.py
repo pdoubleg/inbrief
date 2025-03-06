@@ -13,14 +13,14 @@ from src.models import (
     MedicalRecordsSummaryResult,
     ProviderListingResult,
 )
-from src.medical_records_summary import run_medical_records_summary
-from src.providers_listing import run_provider_listings
-from src.summary_engine.error_handling import handle_llm_errors
-from src.summary_engine_v2.base import ProcessingStrategy
+from src.modules.medical_records_summary import run_medical_records_summary
+from src.modules.providers_listing import run_provider_listings
+from src.llm.error_handling import handle_llm_errors
+from strategies.base import ProcessingStrategy
 
 # Use TYPE_CHECKING to avoid circular imports at runtime
 if TYPE_CHECKING:
-    from src.summary_engine_v2.context import ProcessingInput
+    from src.summary_engine.context import ProcessingInput
 
 
 class MedicalOnlyStrategy(ProcessingStrategy):

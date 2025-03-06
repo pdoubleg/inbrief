@@ -4,20 +4,15 @@ This module provides a factory for creating the appropriate strategy
 based on the input document types and processing flags.
 """
 
-from typing import TYPE_CHECKING
-
 from src.models import ProcessingType
-from src.summary_engine_v2.base import ProcessingStrategy
-from src.summary_engine_v2.strategies import (
-    PrimaryOnlyStrategy,
-    PrimaryAndSupportingStrategy,
-    MedicalOnlyStrategy,
-    SupportingOnlyStrategy
-)
+from src.context.input import ProcessingInput
+from src.strategies.base import ProcessingStrategy
+from src.strategies.primary_only import PrimaryOnlyStrategy
+from src.strategies.primary_and_supporting import PrimaryAndSupportingStrategy
+from src.strategies.medical_only import MedicalOnlyStrategy
+from src.strategies.supporting_only import SupportingOnlyStrategy
 
-# Use TYPE_CHECKING to avoid circular imports at runtime
-if TYPE_CHECKING:
-    from src.summary_engine_v2.context import ProcessingInput
+
 
 
 class StrategyFactory:
@@ -42,7 +37,7 @@ class StrategyFactory:
     """
     
     @staticmethod
-    def create_strategy(input_data: "ProcessingInput") -> ProcessingStrategy:
+    def create_strategy(input_data: ProcessingInput) -> ProcessingStrategy:
         """Create the appropriate strategy based on the input data.
         
         This method uses the processing_type property from the input_data

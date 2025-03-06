@@ -16,7 +16,8 @@ from src.models import (
     ProviderListingResult,
     ProcessingType
 )
-from src.summary_engine_v2.context import ProcessingInput, DocumentProcessor
+from src.context.input import ProcessingInput
+from src.context.process import DocumentProcessor
 
 
 def test_primary_only_workflow_simple():
@@ -59,10 +60,10 @@ class TestEndToEndWorkflow(unittest.TestCase):
             pages=[]
         )
     
-    @patch("src.summary_engine_v2.context.StrategyFactory.create_strategy")
-    @patch("src.summary_engine_v2.strategies.primary_only.run_discovery_summary")
-    @patch("src.summary_engine_v2.strategies.primary_only.run_short_version")
-    @patch("src.summary_engine_v2.strategies.primary_only.run_provider_listings")
+    @patch("src.strategies.factory.StrategyFactory.create_strategy")
+    @patch("src.strategies.primary_only.run_discovery_summary")
+    @patch("src.strategies.primary_only.run_short_version")
+    @patch("src.strategies.primary_only.run_provider_listings")
     def test_primary_only_automatic_workflow(
         self, mock_provider_listings, mock_short_version, mock_discovery_summary, mock_create_strategy
     ):
@@ -110,9 +111,9 @@ class TestEndToEndWorkflow(unittest.TestCase):
         # Verify the correct mocks were called
         mock_create_strategy.assert_called_once()
     
-    @patch("src.summary_engine_v2.context.StrategyFactory.create_strategy")
-    @patch("src.summary_engine_v2.strategies.medical_only.run_medical_records_summary")
-    @patch("src.summary_engine_v2.strategies.medical_only.run_provider_listings")
+    @patch("src.strategies.factory.StrategyFactory.create_strategy")
+    @patch("src.strategies.medical_only.run_medical_records_summary")
+    @patch("src.strategies.medical_only.run_provider_listings")
     def test_medical_only_automatic_workflow(
         self, mock_provider_listings, mock_medical_records_summary, mock_create_strategy
     ):
@@ -160,7 +161,7 @@ class TestEndToEndWorkflow(unittest.TestCase):
         # Verify the correct mocks were called
         mock_create_strategy.assert_called_once()
     
-    @patch("src.summary_engine_v2.context.StrategyFactory.create_strategy")
+    @patch("src.strategies.factory.StrategyFactory.create_strategy")
     def test_integration_of_validation_and_factory(self, mock_create_strategy):
         """Test integration between ProcessingInput validation and StrategyFactory."""
         # Create mock strategies

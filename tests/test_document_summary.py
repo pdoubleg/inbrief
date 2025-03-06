@@ -22,7 +22,7 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai import capture_run_messages
 
-from src.document_summary import (
+from src.modules.document_summary import (
     process_discovery_document,
     process_single_document,
     process_documents_async,
@@ -179,10 +179,10 @@ class TestDocumentSummary:
         # Arrange - Mock the utility functions
         with (
             patch(
-                "src.document_summary.prepare_processed_document_chunks",
+                "src.modules.document_summary.prepare_processed_document_chunks",
                 return_value=mock_processed_documents,
             ),
-            patch("src.document_summary.count_tokens", return_value=5000),
+            patch("src.modules.document_summary.count_tokens", return_value=5000),
         ):
             # Create test usage
             test_usage = Usage(request_tokens=100, response_tokens=50, total_tokens=150)
@@ -192,27 +192,16 @@ class TestDocumentSummary:
             mock_summary_result.data = "Test summary"
             mock_summary_result.usage.return_value = test_usage
 
-            mock_title_desc = TitleAndDescriptionResult(
-                title="Test Title", description="Test Description"
-            )
-
             # Act
-            with patch(
-                "src.document_summary.document_summary_agent.run",
-                return_value=mock_summary_result,
+            with (
+                document_summary_agent.override(model=TestModel()),
+                intermediate_summary_agent.override(model=TestModel()),
+                consolidated_summary_agent.override(model=TestModel()),
+                title_description_agent.override(model=TestModel()),
             ):
-                # Create a proper async function to replace generate_title_and_description
-                async def mock_generate_title_and_description(*args, **kwargs):
-                    return mock_title_desc, test_usage
-                
-                # Patch the function with our async implementation
-                with patch(
-                    "src.document_summary.generate_title_and_description",
-                    mock_generate_title_and_description
-                ):
-                    result = await process_discovery_document(
-                        mock_documents[0], add_labels=True
-                    )
+                result = await process_discovery_document(
+                    mock_documents[0], add_labels=True
+                )
 
         # Assert
         assert isinstance(result, dict)
@@ -249,7 +238,7 @@ class TestDocumentSummary:
 
         # Act
         with patch(
-            "src.document_summary.process_discovery_document", mock_process_discovery
+            "src.modules.document_summary.process_discovery_document", mock_process_discovery
         ):
             result = await process_single_document(mock_documents[0], exhibit_number=1)
 
@@ -290,7 +279,7 @@ class TestDocumentSummary:
 
         # Act
         with patch(
-            "src.document_summary.process_single_document", mock_process_single
+            "src.modules.document_summary.process_single_document", mock_process_single
         ):
             result = await process_documents_async(mock_documents)
 
@@ -329,7 +318,7 @@ class TestDocumentSummary:
 
         # Act
         with patch(
-            "src.document_summary.process_documents_async", return_value=expected_result
+            "src.modules.document_summary.process_documents_async", return_value=expected_result
         ):
             result = run_documents_summary(mock_documents)
 

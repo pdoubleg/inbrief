@@ -5,7 +5,7 @@ to generate context summaries and provider listings.
 """
 
 import time
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional
 
 from src.models import (
     ConversionResult,
@@ -15,17 +15,14 @@ from src.models import (
     DocumentsProducedResult,
     ProviderListingResult,
 )
-from src.document_summary import run_documents_summary
-from src.short_version_summary import run_short_version_exhibits
-from src.documents_produced import run_documents_produced_report
-from src.providers_listing import run_provider_listings
-from src.summary_engine.error_handling import handle_llm_errors
+from src.modules.document_summary import run_documents_summary
+from src.modules.short_version_summary import run_short_version_exhibits
+from src.modules.documents_produced import run_documents_produced_report
+from src.modules.providers_listing import run_provider_listings
+from src.llm.error_handling import handle_llm_errors
 
-from src.summary_engine_v2.base import ProcessingStrategy
-
-# Use TYPE_CHECKING to avoid circular imports at runtime
-if TYPE_CHECKING:
-    from src.summary_engine_v2.context import ProcessingInput
+from src.strategies.base import ProcessingStrategy
+from src.context.input import ProcessingInput
 
 
 class SupportingOnlyStrategy(ProcessingStrategy):

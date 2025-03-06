@@ -24,7 +24,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai import capture_run_messages
 
-from src.medical_records_summary import (
+from src.modules.medical_records_summary import (
     process_chunk,
     consolidate_summaries,
     generate_title_description,
@@ -259,10 +259,10 @@ class TestMedicalRecordsSummary:
         # Arrange - Mock the utility functions
         with (
             patch(
-                "src.medical_records_summary.prepare_processed_document_chunks",
+                "src.modules.medical_records_summary.prepare_processed_document_chunks",
                 return_value=mock_processed_documents,
             ),
-            patch("src.medical_records_summary.count_tokens", return_value=5000),
+            patch("src.modules.medical_records_summary.count_tokens", return_value=5000),
         ):
             # Create test usage
             test_usage = Usage(request_tokens=100, response_tokens=50, total_tokens=150)
@@ -282,15 +282,15 @@ class TestMedicalRecordsSummary:
             # Patch the functions
             with (
                 patch(
-                    "src.medical_records_summary.process_chunk",
+                    "src.modules.medical_records_summary.process_chunk",
                     return_value=mock_process_chunk_tuple,
                 ),
                 patch(
-                    "src.medical_records_summary.consolidate_summaries",
+                    "src.modules.medical_records_summary.consolidate_summaries",
                     return_value=mock_consolidate_summaries_tuple,
                 ),
                 patch(
-                    "src.medical_records_summary.finalization_agent.run",
+                    "src.modules.medical_records_summary.finalization_agent.run",
                     return_value=mock_finalization_result,
                 ),
             ):
@@ -324,10 +324,10 @@ class TestMedicalRecordsSummary:
         # Arrange - Mock the utility functions
         with (
             patch(
-                "src.medical_records_summary.prepare_processed_document_chunks",
+                "src.modules.medical_records_summary.prepare_processed_document_chunks",
                 return_value=mock_processed_documents,
             ),
-            patch("src.medical_records_summary.count_tokens", return_value=5000),
+            patch("src.modules.medical_records_summary.count_tokens", return_value=5000),
         ):
             # Create test usage
             test_usage = Usage(request_tokens=100, response_tokens=50, total_tokens=150)
@@ -355,19 +355,19 @@ class TestMedicalRecordsSummary:
             # Patch the functions
             with (
                 patch(
-                    "src.medical_records_summary.process_chunk",
+                    "src.modules.medical_records_summary.process_chunk",
                     return_value=mock_process_chunk_tuple,
                 ),
                 patch(
-                    "src.medical_records_summary.consolidate_summaries",
+                    "src.modules.medical_records_summary.consolidate_summaries",
                     return_value=mock_consolidate_summaries_tuple,
                 ),
                 patch(
-                    "src.medical_records_summary.finalization_agent.run",
+                    "src.modules.medical_records_summary.finalization_agent.run",
                     return_value=mock_finalization_result,
                 ),
                 patch(
-                    "src.medical_records_summary.generate_title_description",
+                    "src.modules.medical_records_summary.generate_title_description",
                     return_value=mock_title_desc_tuple,
                 ),
             ):
@@ -403,10 +403,10 @@ class TestMedicalRecordsSummary:
         # Arrange - Mock the utility functions
         with (
             patch(
-                "src.medical_records_summary.prepare_processed_document_chunks",
+                "src.modules.medical_records_summary.prepare_processed_document_chunks",
                 return_value=mock_processed_documents,
             ),
-            patch("src.medical_records_summary.count_tokens", return_value=5000),
+            patch("src.modules.medical_records_summary.count_tokens", return_value=5000),
         ):
             # Create test usage
             test_usage = Usage(request_tokens=100, response_tokens=50, total_tokens=150)
@@ -426,15 +426,15 @@ class TestMedicalRecordsSummary:
             # Patch the functions
             with (
                 patch(
-                    "src.medical_records_summary.process_chunk",
+                    "src.modules.medical_records_summary.process_chunk",
                     return_value=mock_process_chunk_tuple,
                 ),
                 patch(
-                    "src.medical_records_summary.consolidate_summaries",
+                    "src.modules.medical_records_summary.consolidate_summaries",
                     return_value=mock_consolidate_summaries_tuple,
                 ),
                 patch(
-                    "src.medical_records_summary.finalization_agent.run",
+                    "src.modules.medical_records_summary.finalization_agent.run",
                     return_value=mock_finalization_result,
                 ),
             ):
@@ -472,7 +472,7 @@ class TestMedicalRecordsSummary:
 
         # Act - Mock the asynchronous function and call the synchronous wrapper
         with patch(
-            "src.medical_records_summary.process_medical_records",
+            "src.modules.medical_records_summary.process_medical_records",
             return_value=expected_result,
         ):
             result = run_medical_records_summary(mock_medical_records)
@@ -506,7 +506,7 @@ class TestMedicalRecordsSummary:
 
         # Act - Mock the asynchronous function and call the synchronous wrapper
         with patch(
-            "src.medical_records_summary.process_medical_records",
+            "src.modules.medical_records_summary.process_medical_records",
             return_value=expected_result,
         ):
             result = run_medical_records_summary(

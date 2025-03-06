@@ -16,6 +16,7 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "pytest-asyncio>=0.25.3",
     "python-dotenv>=1.0.1",
+    "seaborn>=0.13.2",
     "streamlit>=1.42.2",
     "streamlit-extras>=0.5.5",
     "streamlit-shadcn-ui>=0.1.18",

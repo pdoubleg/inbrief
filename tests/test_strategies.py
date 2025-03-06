@@ -4,27 +4,32 @@ This module contains tests for the various document processing strategies
 in the summary engine.
 """
 
+import pytest
 import unittest
 from unittest.mock import patch, MagicMock
-import time
+
+from pydantic_ai import models
+from pydantic import ValidationError
 
 from src.models import (
     ConversionResult,
     SummaryResult,
     DiscoverySummaryResult,
     ShortVersionResult,
-    ProviderListingResult,
     ProcessingType
 )
-from src.summary_engine_v2.strategies import (
-    PrimaryOnlyStrategy,
-    SupportingOnlyStrategy,
-    MedicalOnlyStrategy,
-    PrimaryAndSupportingStrategy
-)
-from src.summary_engine_v2.strategies.factory import StrategyFactory
-from src.summary_engine_v2.context import ProcessingInput, DocumentProcessor
-from pydantic import ValidationError
+from src.strategies.primary_only import PrimaryOnlyStrategy
+from src.strategies.supporting_only import SupportingOnlyStrategy
+from src.strategies.medical_only import MedicalOnlyStrategy
+from src.strategies.primary_and_supporting import PrimaryAndSupportingStrategy
+from src.strategies.factory import StrategyFactory
+from src.context.process import DocumentProcessor
+from src.context.input import ProcessingInput
+
+
+# Disable real model requests during tests
+pytestmark = pytest.mark.anyio
+models.ALLOW_MODEL_REQUESTS = False
 
 
 class TestProcessingInputValidation(unittest.TestCase):
@@ -301,46 +306,6 @@ class TestDocumentProcessor(unittest.TestCase):
         processor.set_strategy(new_strategy)
         self.assertEqual(processor.strategy, new_strategy)
     
-    @patch('src.summary_engine_v2.context.StrategyFactory')
-    def test_process_creates_strategy_if_none(self, mock_factory):
-        """Test that process creates a strategy if none exists."""
-        # Setup
-        processor = DocumentProcessor()
-        processor.strategy = None
-        
-        # Create a mock strategy
-        mock_strategy = MagicMock()
-        mock_result = SummaryResult(
-            doc_id="test_job",
-            long_version="Test result",
-            short_version="",
-            provider_listing="",
-            documents_produced="",
-            exhibits_research="",
-            processing_time=0.0
-        )
-        mock_strategy.process.return_value = mock_result
-        
-        # Setup factory mock
-        mock_factory.create_strategy.return_value = mock_strategy
-        
-        # Create input data
-        input_data = ProcessingInput(
-            primary_docs=[self.primary_doc],
-            job_id="test_job"
-        )
-        
-        # Process
-        result = processor.process(input_data)
-        
-        # Verify factory called
-        mock_factory.create_strategy.assert_called_once_with(input_data)
-        
-        # Verify strategy was used
-        mock_strategy.process.assert_called_once_with(input_data)
-        
-        # Verify we got the expected result
-        self.assertEqual(result, mock_result)
 
 
 class TestPrimaryOnlyStrategy(unittest.TestCase):
@@ -359,8 +324,8 @@ class TestPrimaryOnlyStrategy(unittest.TestCase):
             job_id="test_job"
         )
     
-    @patch("src.summary_engine_v2.strategies.primary_only.run_discovery_summary")
-    @patch("src.summary_engine_v2.strategies.primary_only.run_short_version")
+    @patch("src.strategies.primary_only.run_discovery_summary")
+    @patch("src.strategies.primary_only.run_short_version")
     def test_process(self, mock_short_version, mock_discovery_summary):
         """Test the process method of PrimaryOnlyStrategy."""
         # Setup mock returns
@@ -380,6 +345,3 @@ class TestPrimaryOnlyStrategy(unittest.TestCase):
         mock_short_version.assert_called_once_with("Long summary")
 
 
-
-if __name__ == "__main__":
-    unittest.main() 

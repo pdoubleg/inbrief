@@ -19,7 +19,7 @@ from pydantic_ai.usage import Usage
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.models.test import TestModel
 
-from src.documents_produced import (
+from src.modules.documents_produced import (
     generate_documents_produced_summary,
     run_documents_produced_report,
     documents_produced_agent,

@@ -125,10 +125,10 @@ async def add_instructions(ctx: RunContext[str]) -> str:  # noqa: F811
 
 
 def run_short_version(long_version: str) -> ShortVersionResult:
-    result = asyncio.run(short_version_agent.run(deps=long_version))
+    result = asyncio.run(short_version_agent.run(user_prompt=None, deps=long_version))
     return ShortVersionResult(summary=result.data, usages=result.usage())
 
 
 def run_short_version_exhibits(draft_report: str) -> ShortVersionResult:
-    result = asyncio.run(short_version_exhibits_agent.run(deps=draft_report))
+    result = asyncio.run(short_version_exhibits_agent.run(user_prompt=None, deps=draft_report))
     return ShortVersionResult(summary=result.data, usages=result.usage())

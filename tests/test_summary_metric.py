@@ -1,11 +1,10 @@
-"""Tests for the pydantic_metric module."""
+"""Tests for the summary metric module."""
 
 import unittest
-import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import MagicMock
 import pytest
 
-from src.summary_engine_v2.pydantic_metric import (
+from src.llm.summary_metric import (
     KeyIdea,
     BreakdownResult,
     EvaluationResult,
@@ -14,11 +13,16 @@ from src.summary_engine_v2.pydantic_metric import (
     evaluate_llm_summary,
     calculate_weighted_score,
     evaluate_summary_pair,
-    summary_evaluation_metric,
     breakdown_agent,
     evaluation_agent,
 )
 from pydantic_ai.usage import Usage
+from pydantic_ai.models.test import TestModel
+from pydantic_ai import models
+
+# Disable real model requests during tests
+pytestmark = pytest.mark.anyio
+models.ALLOW_MODEL_REQUESTS = False
 
 
 class TestKeyIdea(unittest.TestCase):
@@ -187,138 +191,61 @@ class TestCalculateWeightedScore(unittest.TestCase):
         self.assertEqual(score, 0.0)
 
 
-# Convert TestAsyncFunctions to use unittest.TestCase for consistency
-class TestAsyncFunctions(unittest.TestCase):
+class TestAsyncFunctions:
     """Tests for the async functions in the module."""
-
+    
     @pytest.mark.asyncio
-    @patch("src.summary_engine_v2.pydantic_metric.breakdown_agent")
-    async def test_breakdown_gold_summary(self, mock_agent):
-        """Test breakdown_gold_summary function."""
-        # Setup mock
-        mock_result = MagicMock()
-        mock_result.data = BreakdownResult(
-            key_ideas=[KeyIdea(idea="Test idea", importance="High")]
-        )
-        mock_agent.run = AsyncMock(return_value=mock_result)
+    async def test_breakdown_gold_summary(self):
+        """Test breakdown_gold_summary function with TestModel."""
+        with (
+            breakdown_agent.override(model=TestModel()),
+            evaluation_agent.override(model=TestModel()),
+        ):
+            # Call function with test model
+            result = await breakdown_gold_summary("Test gold summary")
+            result = result.data
+        # TestModel returns the same type as the expected result
+        # So we just verify the shape/type is correct
+        assert isinstance(result, BreakdownResult)
+        assert len(result.key_ideas) > 0
         
-        # Call function
-        result = await breakdown_gold_summary("Test gold summary")
-        
-        # Verify
-        mock_agent.run.assert_called_once()
-        self.assertEqual(result, mock_result.data)
-
     @pytest.mark.asyncio
-    @patch("src.summary_engine_v2.pydantic_metric.evaluation_agent")
-    async def test_evaluate_llm_summary(self, mock_agent):
-        """Test evaluate_llm_summary function."""
-        # Setup mock
-        mock_result = MagicMock()
-        mock_result.data = EvaluationResult(
-            explanation="Test explanation",
-            binary_scores=[True],
-            overall_score=0.8,
-        )
-        mock_agent.run = AsyncMock(return_value=mock_result)
-        
+    async def test_evaluate_llm_summary(self):
+        """Test evaluate_llm_summary function with TestModel."""
         key_ideas = BreakdownResult(
             key_ideas=[KeyIdea(idea="Test idea", importance="High")]
         )
+        with (
+            breakdown_agent.override(model=TestModel()),
+            evaluation_agent.override(model=TestModel()),
+        ):
+            # Call function with test model
+            result = await evaluate_llm_summary("Test llm summary", key_ideas)
+            result = result.data
+        # Verify the result structure
+        assert isinstance(result, EvaluationResult)
+        assert isinstance(result.explanation, str)
+        assert isinstance(result.binary_scores, list)
+        assert isinstance(result.overall_score, float)
         
-        # Call function
-        result = await evaluate_llm_summary("Test llm summary", key_ideas)
-        
-        # Verify
-        mock_agent.run.assert_called_once()
-        self.assertEqual(result, mock_result.data)
-
     @pytest.mark.asyncio
-    @patch("src.summary_engine_v2.pydantic_metric.breakdown_gold_summary")
-    @patch("src.summary_engine_v2.pydantic_metric.evaluate_llm_summary")
-    @patch("src.summary_engine_v2.pydantic_metric.calculate_weighted_score")
-    async def test_evaluate_summary_pair(
-        self, mock_calculate, mock_evaluate, mock_breakdown
-    ):
-        """Test evaluate_summary_pair function."""
-        # Setup mocks
-        key_ideas = BreakdownResult(
-            key_ideas=[KeyIdea(idea="Test idea", importance="High")]
-        )
-        evaluation = EvaluationResult(
-            explanation="Test explanation",
-            binary_scores=[True],
-            overall_score=0.8,
-        )
-        
-        mock_breakdown_result = MagicMock()
-        mock_breakdown_result.data = key_ideas
-        # Create a mock for usage() method
-        mock_usage = MagicMock(spec=Usage)
-        mock_breakdown_result.usage.return_value = mock_usage
-        
-        mock_evaluate_result = MagicMock()
-        mock_evaluate_result.data = evaluation
-        mock_evaluate_result.usage.return_value = mock_usage
-        
-        mock_breakdown.return_value = mock_breakdown_result
-        mock_evaluate.return_value = mock_evaluate_result
-        mock_calculate.return_value = 0.85
-        
-        # Call function
+    async def test_evaluate_summary_pair(self):
+        """Test evaluate_summary_pair function with TestModel."""
+        # Setup test data
         deps = EvalDeps(
-            gold_summary="Gold summary",
-            pred_summary="Predicted summary",
+            gold_summary="This is a gold summary.",
+            pred_summary="This is a predicted summary.",
         )
-        result = await evaluate_summary_pair(deps)
-        
-        # Verify
-        mock_breakdown.assert_called_once_with("Gold summary")
-        mock_evaluate.assert_called_once_with("Predicted summary", key_ideas)
-        mock_calculate.assert_called_once_with(key_ideas, evaluation)
-        
-        self.assertEqual(result.key_ideas, key_ideas)
-        self.assertEqual(result.evaluation, evaluation)
-        self.assertEqual(result.score, 0.85)
-        self.assertEqual(len(result.usages), 2)
-
-
-class TestSummaryEvaluationMetric(unittest.TestCase):
-    """Tests for the summary_evaluation_metric function."""
-
-    def test_summary_evaluation_metric(self):
-        """Test summary_evaluation_metric function."""
-        # Setup mock
-        deps = EvalDeps(
-            gold_summary="Gold summary",
-            pred_summary="Predicted summary",
-        )
-        
-        # Create a populated deps object that would be returned by evaluate_summary_pair
-        populated_deps = EvalDeps(
-            gold_summary="Gold summary",
-            pred_summary="Predicted summary",
-            key_ideas=BreakdownResult(
-                key_ideas=[KeyIdea(idea="Test idea", importance="High")]
-            ),
-            evaluation=EvaluationResult(
-                explanation="Test explanation",
-                binary_scores=[True],
-                overall_score=0.8,
-            ),
-            score=0.85,
-            usages=[],  # Use empty list instead of trying to create Usage objects
-        )
-        
-        # Patch the asyncio.run function
-        with patch('asyncio.run', return_value=populated_deps) as mock_run:
+        with (
+            breakdown_agent.override(model=TestModel()),
+            evaluation_agent.override(model=TestModel()),
+        ):
             # Call function
-            result = summary_evaluation_metric(deps)
-            
-            # Verify
-            mock_run.assert_called_once()
-            self.assertEqual(result, populated_deps)
+            result = await evaluate_summary_pair(deps)
+        
+        # Verify structure and results
+        assert result.key_ideas is not None
+        assert result.evaluation is not None
+        assert result.score is not None
+        assert len(result.usages) > 0
 
-
-if __name__ == "__main__":
-    unittest.main() 

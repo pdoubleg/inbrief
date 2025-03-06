@@ -19,7 +19,7 @@ from pydantic_ai.usage import Usage
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.models.openai import OpenAIModel
 
-from src.discovery_summary import (
+from src.modules.discovery_summary import (
     process_discovery_document,
     run_discovery_summary,
     discovery_summary_agent,
@@ -133,7 +133,7 @@ History of Present Illness: 48-year-old male construction worker who fell approx
             setup_test_model: Fixture to set up the test models
         """
         # Arrange - Mock the token count to be below threshold
-        with patch("src.discovery_summary.count_tokens", return_value=10000):
+        with patch("src.modules.discovery_summary.count_tokens", return_value=10000):
             # Act
             result = await process_discovery_document(mock_discovery_document)
 
@@ -162,7 +162,7 @@ History of Present Illness: 48-year-old male construction worker who fell approx
             setup_test_model: Fixture to set up the test models
         """
         # Arrange - Mock the token count to be below threshold
-        with patch("src.discovery_summary.count_tokens", return_value=15000):
+        with patch("src.modules.discovery_summary.count_tokens", return_value=15000):
             # Act
             result = await process_discovery_document(
                 mock_discovery_document, supporting_documents=mock_supporting_documents
@@ -189,7 +189,7 @@ History of Present Illness: 48-year-old male construction worker who fell approx
             setup_test_model: Fixture to set up the test models
         """
         # Arrange - Mock the token count to be above threshold
-        with patch("src.discovery_summary.count_tokens", return_value=40000):
+        with patch("src.modules.discovery_summary.count_tokens", return_value=40000):
             # Act
             result = await process_discovery_document(
                 mock_discovery_document, reasoning_model_threshold=30000
@@ -234,6 +234,7 @@ History of Present Illness: 48-year-old male construction worker who fell approx
             mock_run.return_value = mock_result
 
             # Act
+            # Call run_discovery_summary, which is the synchronous wrapper around process_discovery_document
             result = run_discovery_summary(mock_discovery_document)
 
         # Assert
@@ -272,10 +273,10 @@ History of Present Illness: 48-year-old male construction worker who fell approx
             reasoning_completion_tokens=0,
         )
         
-        # Use a more effective patching approach to avoid coroutine warnings
-        with patch("src.discovery_summary.asyncio.run") as mock_run:
-            mock_run.return_value = mock_result
-            
+        with (
+            discovery_summary_agent.override(model=TestModel()),
+            reasoning_agent.override(model=TestModel()),
+        ):
             # Act
             result = run_discovery_summary(
                 mock_discovery_document, supporting_documents=mock_supporting_documents

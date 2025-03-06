@@ -20,7 +20,7 @@ from pydantic_ai.usage import Usage
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.agent import AgentRunResult, RunContext
 
-from src.providers_listing import (
+from src.modules.providers_listing import (
     generate_provider_listings,
     run_provider_listings,
     qc_agent,
@@ -335,7 +335,7 @@ class TestProvidersListing:
         """
         # Arrange
         with patch(
-            "src.providers_listing.prepare_processed_document_chunks",
+            "src.modules.providers_listing.prepare_processed_document_chunks",
             return_value=mock_processed_documents,
         ):
             # Mock entity extractor results
@@ -414,7 +414,7 @@ class TestProvidersListing:
         """
         # Arrange
         with patch(
-            "src.providers_listing.prepare_processed_document_chunks",
+            "src.modules.providers_listing.prepare_processed_document_chunks",
             return_value=mock_processed_documents,
         ):
             # Mock entity extractor results
@@ -496,7 +496,7 @@ class TestProvidersListing:
 
         # Act
         with patch(
-            "src.providers_listing.generate_provider_listings",
+            "src.modules.providers_listing.generate_provider_listings",
             return_value=expected_result,
         ):
             result = run_provider_listings(primary_documents=mock_documents)

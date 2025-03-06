@@ -49,6 +49,67 @@ def has_common_column_name(list_a: List[str], list_b: List[str]) -> bool:
     return not set(list_a).isdisjoint(list_b)
 
 
+def calculate_header_similarity(headers_1: List[str], headers_2: List[str]) -> float:
+    """
+    Calculate the similarity between two sets of table headers.
+    
+    The similarity is defined as the ratio of common headers to the total unique headers.
+    
+    Args:
+        headers_1: First list of header strings.
+        headers_2: Second list of header strings.
+        
+    Returns:
+        A float between 0.0 and 1.0 representing the similarity percentage.
+        0.0 means no common headers, 1.0 means identical headers.
+        
+    Example:
+        >>> calculate_header_similarity(['Name', 'Age', 'City'], ['Name', 'Age', 'Country'])
+        0.5  # 2 common headers out of 4 unique headers
+    """
+    if not headers_1 or not headers_2:
+        return 0.0
+        
+    # Convert to sets for efficient operations
+    set_1 = set(headers_1)
+    set_2 = set(headers_2)
+    
+    # Calculate intersection and union
+    common_headers = set_1.intersection(set_2)
+    all_unique_headers = set_1.union(set_2)
+    
+    # Calculate similarity ratio
+    if not all_unique_headers:
+        return 0.0
+        
+    return len(common_headers) / len(all_unique_headers)
+
+
+def in_similar_table(page_1: Page, page_2: Page, threshold: float = 0.3) -> bool:
+    """
+    Check if two pages have similar tables based on header similarity.
+    
+    Args:
+        page_1: First page object.
+        page_2: Second page object.
+        threshold: Minimum similarity ratio required to consider tables similar.
+                  Value between 0.0 and 1.0. Default: 0.3
+                  
+    Returns:
+        True if the header similarity is greater than or equal to the threshold,
+        False otherwise.
+        
+    Example:
+        >>> in_similar_table(page1, page2, threshold=0.5)
+        True  # If at least 50% of headers match
+    """
+    headers_1 = page_1.table_headers
+    headers_2 = page_2.table_headers
+    
+    similarity = calculate_header_similarity(headers_1, headers_2)
+    return similarity >= threshold
+
+
 def is_same_table(page_1: Page, page_2: Page) -> bool:
     """
     Check if two pages have the same table based on headers.
@@ -69,6 +130,7 @@ def create_dynamic_text_chunks(
     pages: Union[List[Page], List[str]],
     max_chunk_size: int = 20000,
     cap_multiplier: float = 1.0,
+    table_similarity_threshold: float = 0.3,
 ) -> List[TextChunk]:
     """
     Splits a list of pages into chunks of text with approximately equal token distribution
@@ -79,6 +141,8 @@ def create_dynamic_text_chunks(
         max_chunk_size: The maximum number of tokens allowed per chunk. Default: 20000.
         cap_multiplier: Multiplier for the target chunk size to allow
                         larger chunks when necessary for multi-page tables. Default: 1.0.
+        table_similarity_threshold: Minimum similarity ratio required to consider tables similar.
+                                   Value between 0.0 and 1.0. Default: 0.3
 
     Returns:
         A list of TextChunk objects representing the chunks of text.
@@ -140,7 +204,9 @@ def create_dynamic_text_chunks(
         if current_tokens + page_tokens > target_chunk_size:
             # If it is part of the same table, allow up to the dynamic cap
             if current_tokens + page_tokens <= dynamic_cap and (
-                page_number > 1 and is_same_table(pages[page_number - 2], page)
+                page_number > 1 and in_similar_table(
+                    pages[page_number - 2], page, threshold=table_similarity_threshold
+                )
             ):
                 # Continue adding as it's part of the same table
                 current_text_list.append(page.text)
@@ -258,13 +324,7 @@ def log_exception(
         error_category: Category of the error.
         error_traceback: Error traceback.
     """
-    # Log to logger
-    logger.error(
-        f"Error in job {job_id or 'unknown'}, model {model or 'unknown'}, "
-        f"category {error_category or 'unknown'}: {error_message or 'Unknown error'}"
-    )
 
     if error_traceback:
         logger.debug(f"Traceback: {error_traceback}")
 
-    # Additional logging to monitoring systems can be added here if needed

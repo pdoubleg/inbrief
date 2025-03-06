@@ -23,7 +23,7 @@ from src.models import (
     ShortVersionResult,
     ContextSummary,
 )
-from src.summary_engine.error_handling import handle_llm_errors
+from src.llm.error_handling import handle_llm_errors
 
 
 class MockProcessingStrategy:

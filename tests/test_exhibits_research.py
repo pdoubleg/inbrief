@@ -21,7 +21,7 @@ from pydantic_ai.usage import Usage
 from pydantic_ai.models.test import TestModel
 from pydantic_ai.agent import AgentRunResult, RunContext
 
-from src.exhibits_research import (
+from src.modules.exhibits_research import (
     perform_exhibits_research,
     run_exhibits_research,
     issue_finder_agent,
@@ -379,7 +379,7 @@ class TestExhibitsResearch:
 
         # Act
         with patch(
-            "src.exhibits_research.perform_exhibits_research",
+            "src.modules.exhibits_research.perform_exhibits_research",
             return_value=expected_result,
         ):
             result = run_exhibits_research(primary_doc, mock_context_summaries)

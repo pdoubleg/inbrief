@@ -22,7 +22,7 @@ from pydantic_ai.messages import ModelResponse
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai import capture_run_messages
 
-from src.short_version_summary import (
+from src.modules.short_version_summary import (
     get_short_version_prompt,
     get_short_version_exhibits_prompt,
     short_version_agent,

@@ -16,13 +16,8 @@ from src.models import (
     DocumentsProducedResult,
     ProviderListingResult,
 )
-from src.summary_engine.error_handling import handle_llm_errors
-
-# Forward reference for type hints
-# We'll use this instead of directly importing from context.py to avoid circular imports
-class ProcessingInput:
-    """Forward reference for ProcessingInput type to avoid circular imports."""
-    pass
+from src.context.input import ProcessingInput
+from src.llm.error_handling import handle_llm_errors
 
 
 class ProcessingStrategy(ABC):
@@ -37,7 +32,7 @@ class ProcessingStrategy(ABC):
     """
     
     @abstractmethod
-    def process(self, input_data: "ProcessingInput") -> SummaryResult:
+    def process(self, input_data: ProcessingInput) -> SummaryResult:
         """Process the documents according to the strategy.
         
         This is the main method that all concrete strategies must implement.
@@ -65,7 +60,7 @@ class ProcessingStrategy(ABC):
         Raises:
             ValueError: If documents is empty
         """
-        from src.document_summary import run_documents_summary
+        from src.modules.document_summary import run_documents_summary
         
         if not documents:
             raise ValueError("No supporting documents provided")
@@ -85,7 +80,7 @@ class ProcessingStrategy(ABC):
         Raises:
             ValueError: If documents is empty
         """
-        from src.medical_records_summary import run_medical_records_summary
+        from src.modules.medical_records_summary import run_medical_records_summary
         
         if not documents:
             raise ValueError("No medical records provided")
@@ -105,7 +100,7 @@ class ProcessingStrategy(ABC):
         Returns:
             DiscoverySummaryResult: The high-level summary
         """
-        from src.discovery_summary import run_discovery_summary
+        from src.modules.discovery_summary import run_discovery_summary
         
         return run_discovery_summary(discovery_document, supporting_documents)
     
@@ -121,7 +116,7 @@ class ProcessingStrategy(ABC):
         Returns:
             DocumentsProducedResult: The documents produced summary
         """
-        from src.documents_produced import run_documents_produced_report
+        from src.modules.documents_produced import run_documents_produced_report
         
         return run_documents_produced_report(context_summaries)
     
@@ -140,6 +135,7 @@ class ProcessingStrategy(ABC):
         Returns:
             ProviderListingResult: Listing of all providers found
         """
-        from src.providers_listing import run_provider_listings
+        from src.modules.providers_listing import run_provider_listings
         
-        return run_provider_listings(primary_docs, supporting_docs) 
+        return run_provider_listings(primary_docs, supporting_docs)
+    
