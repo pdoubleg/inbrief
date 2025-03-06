@@ -17,3 +17,5 @@ data/dalle_output/DALLE3Pr_20250304_201038.jpeg
 data/dalle_output/Promptfo_20250304_000028.jpeg
 .sesskey
 src/summary_eval_output/
+site/
+docs/

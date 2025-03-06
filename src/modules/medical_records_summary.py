@@ -245,7 +245,6 @@ async def process_chunk(chunk: str) -> Tuple[str, Usage]:
 
     Args:
         chunk: The text chunk to process
-        deps: Dependencies for the agent
 
     Returns:
         A tuple containing the summary and usage information
@@ -262,7 +261,7 @@ async def consolidate_summaries(
 
     Args:
         summaries: List of summaries to consolidate
-        deps: Dependencies for the agent
+        chunk_size: Maximum size of each chunk in tokens
 
     Returns:
         A tuple containing the consolidated summary and usage information
@@ -311,7 +310,6 @@ async def generate_title_description(
 
     Args:
         summary: The summary to generate a title and description for
-        deps: Dependencies for the agent
 
     Returns:
         A tuple containing the title and description result and usage information

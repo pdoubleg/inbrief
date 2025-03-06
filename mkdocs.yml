@@ -2,6 +2,15 @@ site_name: My Project Documentation
 nav:
   - Home: index.md
   - About: about.md
+  - Modules:
+    - Overview: modules.md
+    - Discovery Summary: modules/discovery_summary.md
+    - Document Summary: modules/document_summary.md
+    - Documents Produced: modules/documents_produced.md
+    - Exhibits Research: modules/exhibits_research.md
+    - Medical Records Summary: modules/medical_records_summary.md
+    - Providers Listing: modules/providers_listing.md
+    - Short Version Summary: modules/short_version_summary.md
 theme: material
 plugins:
 - mkdocstrings:
