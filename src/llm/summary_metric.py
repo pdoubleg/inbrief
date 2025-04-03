@@ -53,6 +53,44 @@ class EvalDeps(BaseModel):
     usages: List[Usage] = Field(default_factory=list)
 
 
+class PrecisionKeyIdea(BaseModel):
+    """Represents a key idea extracted from the LLM summary with its verification status."""
+
+    idea: str
+    accurate: bool = Field(
+        ..., description="Whether the idea is accurate compared to the gold summary (True/False)"
+    )
+    explanation: str = Field(
+        description="Explanation of why the idea is considered accurate or inaccurate"
+    )
+
+
+class PrecisionResult(BaseModel):
+    """Result of evaluating the precision of ideas in an LLM summary."""
+
+    llm_key_ideas: List[PrecisionKeyIdea]
+    precision_score: float = Field(..., ge=0.0, le=1.0)
+    explanation: str = Field(description="Overall explanation of the precision evaluation")
+
+    @property
+    def formatted_key_ideas(self) -> str:
+        return "\n".join(
+            [
+                f"{i+1}. {idea.idea} ({'✓' if idea.accurate else '✗'}) - {idea.explanation}"
+                for i, idea in enumerate(self.llm_key_ideas)
+            ]
+        )
+
+
+class ExtendedEvalDeps(EvalDeps):
+    """Extended evaluation dependencies with precision and recall metrics."""
+    
+    llm_key_ideas: Optional[BreakdownResult] = None
+    precision_result: Optional[PrecisionResult] = None
+    precision_score: Optional[float] = None  
+    recall_score: Optional[float] = None
+
+
 # Agent for breaking down passages into key ideas
 breakdown_agent = Agent[None, BreakdownResult](
     "openai:gpt-4o",
@@ -76,6 +114,34 @@ evaluation_agent = Agent[None, EvaluationResult](
         "For each key idea, determine if the summary contains it (True) or not (False).\n"
         "Then compute an overall score from 0.0 to 1.0 based on how well the summary captures the key ideas,\n"
         "weighted by their importance."
+    ),
+)
+
+
+# New agents for precision calculation
+
+# Agent for breaking down LLM summaries into key ideas
+llm_breakdown_agent = Agent[None, BreakdownResult](
+    "openai:gpt-4o",
+    result_type=BreakdownResult,
+    system_prompt=(
+        "You are an expert at analyzing passages and extracting key ideas.\n"
+        "Given an LLM-generated summary, break it down into key ideas and assign each an importance grade.\n"
+        "Importance grades should be 'High', 'Medium', or 'Low' based on how central the idea is to the summary.\n"
+        "Return both a structured list of ideas with grades and a formatted numbered list."
+    ),
+)
+
+# Agent for evaluating precision of LLM key ideas against gold summary
+precision_agent = Agent[None, PrecisionResult](
+    "openai:gpt-4o",
+    result_type=PrecisionResult,
+    system_prompt=(
+        "You are an expert at evaluating the accuracy of information in summaries.\n"
+        "Compare key ideas from an LLM-generated summary against a gold standard summary.\n"
+        "For each key idea from the LLM summary, determine if it's accurate (True) or inaccurate (False) compared to the gold summary.\n"
+        "An idea is accurate if it represents information that is explicitly stated or strongly implied in the gold summary.\n"
+        "Provide a brief explanation for each judgment and calculate an overall precision score from 0.0 to 1.0."
     ),
 )
 
@@ -148,6 +214,43 @@ def calculate_weighted_score(
     except Exception as _:
         # Fallback to the overall score from the evaluation
         return evaluation.overall_score or 0.0
+
+
+async def breakdown_llm_summary(llm_summary: str) -> BreakdownResult:
+    """
+    Break down an LLM-generated summary into key ideas with importance grades.
+    
+    Args:
+        llm_summary: The LLM-generated summary to analyze
+        
+    Returns:
+        BreakdownResult containing key ideas and their importance grades
+    """
+    result = await llm_breakdown_agent.run(
+        f"Analyze the following LLM-generated summary and extract its key ideas with importance grades:\n\n{llm_summary}",
+    )
+    return result
+
+
+async def evaluate_precision(
+    llm_key_ideas: BreakdownResult, gold_summary: str
+) -> PrecisionResult:
+    """
+    Evaluate the precision of key ideas from an LLM summary against a gold summary.
+    
+    Args:
+        llm_key_ideas: The breakdown of key ideas from the LLM summary
+        gold_summary: The gold standard summary to compare against
+        
+    Returns:
+        PrecisionResult containing accuracy judgments and overall precision score
+    """
+    result = await precision_agent.run(
+        f"Evaluate the accuracy of these key ideas from an LLM summary against the gold standard summary:\n\n"
+        f"KEY IDEAS FROM LLM SUMMARY:\n{llm_key_ideas.formatted_key_ideas}\n\n"
+        f"GOLD STANDARD SUMMARY:\n{gold_summary}",
+    )
+    return result
 
 
 async def evaluate_summary_pair(
@@ -813,4 +916,351 @@ def visualize_evaluation_results(
             else:
                 plt.close()
     
+    return plot_paths
+
+
+async def evaluate_summary_pair_extended(
+    deps: ExtendedEvalDeps,
+) -> ExtendedEvalDeps:
+    """
+    Extended evaluation that calculates both recall and precision metrics.
+    
+    This function:
+    1. Breaks down the gold summary into key ideas (for recall)
+    2. Evaluates the LLM summary against gold key ideas (for recall)
+    3. Breaks down the LLM summary into key ideas (for precision)
+    4. Evaluates LLM key ideas against the gold summary (for precision)
+    5. Calculates weighted scores for both recall and precision
+    
+    Args:
+        deps: Object containing the gold summary and LLM summary
+        
+    Returns:
+        The populated ExtendedEvalDeps object with evaluation results
+        
+    Example:
+        >>> deps = ExtendedEvalDeps(
+        ...     gold_summary="Climate change is causing rising sea levels and extreme weather...",
+        ...     pred_summary="Climate change leads to sea level rise and weather extremes."
+        ... )
+        >>> result = await evaluate_summary_pair_extended(deps)
+        >>> print(f"Recall: {result.recall_score}, Precision: {result.precision_score}")
+        Recall: 0.85, Precision: 0.92
+    """
+    usages: List[Usage] = []
+
+    # Step 1-2: Calculate recall (same as original implementation)
+    key_ideas = await breakdown_gold_summary(deps.gold_summary)
+    deps.key_ideas = key_ideas.data
+    usages.append(key_ideas.usage())
+
+    evaluation = await evaluate_llm_summary(deps.pred_summary, deps.key_ideas)
+    deps.evaluation = evaluation.data
+    usages.append(evaluation.usage())
+
+    # Calculate recall score (the original weighted score is effectively recall)
+    deps.recall_score = calculate_weighted_score(deps.key_ideas, deps.evaluation)
+    deps.score = deps.recall_score  # Keep original score as recall for compatibility
+    
+    # Steps 3-4: Calculate precision (new implementation)
+    llm_key_ideas = await breakdown_llm_summary(deps.pred_summary)
+    deps.llm_key_ideas = llm_key_ideas.data
+    usages.append(llm_key_ideas.usage())
+    
+    precision_result = await evaluate_precision(deps.llm_key_ideas, deps.gold_summary)
+    deps.precision_result = precision_result.data
+    usages.append(precision_result.usage())
+    
+    # Use the precision score from the agent
+    deps.precision_score = deps.precision_result.precision_score
+    
+    # Store all usages
+    deps.usages = usages
+    return deps
+
+
+def summary_evaluation_metric_extended(deps: ExtendedEvalDeps) -> ExtendedEvalDeps:
+    """
+    Compare the LLM summary to the gold summary with extended metrics (precision and recall).
+    
+    Args:
+        deps: Object containing the gold summary and LLM summary
+        
+    Returns:
+        ExtendedEvalDeps object with the results of the evaluation including precision and recall
+    """
+    # Run the extended evaluation asynchronously and populate the deps object
+    populated_deps = asyncio.run(evaluate_summary_pair_extended(deps))
+    
+    return populated_deps
+
+
+async def batch_evaluate_summaries_extended(
+    summary_pairs: Sequence[Dict[str, str]],
+    gold_key: str = "gold_summary",
+    pred_key: str = "pred_summary",
+    id_key: Optional[str] = None,
+    metadata_keys: Optional[List[str]] = None,
+    max_concurrency: int = 5,
+    show_progress: bool = True,
+) -> pd.DataFrame:
+    """
+    Evaluate multiple summary pairs with extended metrics (precision and recall).
+    
+    Args:
+        summary_pairs: A sequence of dictionaries, each containing gold and predicted summaries
+        gold_key: The key for the gold summary (default: "gold_summary")
+        pred_key: The key for the predicted summary (default: "pred_summary")
+        id_key: Optional key to use as an identifier in the results
+        metadata_keys: Optional list of additional keys to include in results
+        max_concurrency: Maximum number of concurrent evaluations (default: 5)
+        show_progress: Whether to show a progress bar (default: True)
+    
+    Returns:
+        A pandas DataFrame containing evaluation results with precision and recall metrics
+    """
+    # Prepare tasks for concurrent execution
+    async def process_pair(pair: Dict[str, str], pair_idx: int) -> Dict[str, Any]:
+        # Create ExtendedEvalDeps object
+        deps = ExtendedEvalDeps(
+            gold_summary=pair[gold_key],
+            pred_summary=pair[pred_key],
+        )
+        
+        # Run extended evaluation
+        result = await evaluate_summary_pair_extended(deps)
+        
+        # Prepare result dictionary with all relevant data
+        result_dict = {
+            "gold_summary": result.gold_summary,
+            "pred_summary": result.pred_summary,
+            "recall_score": result.recall_score,
+            "precision_score": result.precision_score,
+            "f1_score": 2 * (result.precision_score * result.recall_score) / 
+                        (result.precision_score + result.recall_score) 
+                        if (result.precision_score + result.recall_score) > 0 else 0,
+        }
+        
+        # Add identifier if provided
+        if id_key and id_key in pair:
+            result_dict["id"] = pair[id_key]
+        else:
+            result_dict["id"] = f"pair_{pair_idx}"
+            
+        # Add any requested metadata
+        if metadata_keys:
+            for key in metadata_keys:
+                if key in pair:
+                    result_dict[key] = pair[key]
+        
+        # Add diagnostic data from gold summary key ideas (recall)
+        if result.key_ideas:
+            result_dict["gold_key_ideas_count"] = len(result.key_ideas.key_ideas)
+            
+            # Count by importance
+            importance_counts = {"High": 0, "Medium": 0, "Low": 0}
+            for idea in result.key_ideas.key_ideas:
+                importance_counts[idea.importance] += 1
+                
+            result_dict["gold_high_importance_count"] = importance_counts["High"]
+            result_dict["gold_medium_importance_count"] = importance_counts["Medium"]
+            result_dict["gold_low_importance_count"] = importance_counts["Low"]
+            
+            # Store formatted key ideas for reference
+            result_dict["gold_formatted_key_ideas"] = result.key_ideas.formatted_key_ideas
+        
+        # Add diagnostic data from LLM summary key ideas (precision)
+        if result.llm_key_ideas:
+            result_dict["llm_key_ideas_count"] = len(result.llm_key_ideas.key_ideas)
+            
+            # Count by importance
+            importance_counts = {"High": 0, "Medium": 0, "Low": 0}
+            for idea in result.llm_key_ideas.key_ideas:
+                importance_counts[idea.importance] += 1
+                
+            result_dict["llm_high_importance_count"] = importance_counts["High"]
+            result_dict["llm_medium_importance_count"] = importance_counts["Medium"]
+            result_dict["llm_low_importance_count"] = importance_counts["Low"]
+            
+            # Store formatted key ideas for reference
+            result_dict["llm_formatted_key_ideas"] = result.llm_key_ideas.formatted_key_ideas
+        
+        # Add recall evaluation details
+        if result.evaluation:
+            result_dict["recall_binary_scores"] = result.evaluation.binary_scores
+            result_dict["recall_explanation"] = result.evaluation.explanation
+            
+        # Add precision evaluation details
+        if result.precision_result:
+            result_dict["precision_accurate_count"] = sum(1 for idea in result.precision_result.llm_key_ideas if idea.accurate)
+            result_dict["precision_inaccurate_count"] = sum(1 for idea in result.precision_result.llm_key_ideas if not idea.accurate)
+            result_dict["precision_explanation"] = result.precision_result.explanation
+            
+        # Add token usage information
+        if result.usages:
+            total_prompt_tokens = sum(usage.request_tokens for usage in result.usages)
+            total_completion_tokens = sum(usage.response_tokens for usage in result.usages)
+            
+            result_dict["token_usage"] = {
+                "prompt_tokens": total_prompt_tokens,
+                "completion_tokens": total_completion_tokens,
+                "total_tokens": total_prompt_tokens + total_completion_tokens,
+            }
+            
+        return result_dict
+    
+    # Execute the processing with the same concurrency and progress bar logic as the original function
+    # This part is identical to the original batch_evaluate_summaries function
+    tasks = [
+        process_pair(pair, idx) 
+        for idx, pair in enumerate(summary_pairs)
+    ]
+    
+    results = []
+    
+    if show_progress:
+        for task_batch in [tasks[i:i+max_concurrency] for i in range(0, len(tasks), max_concurrency)]:
+            batch_results = await tqdm.gather(*task_batch)
+            results.extend(batch_results)
+    else:
+        for i in range(0, len(tasks), max_concurrency):
+            batch = tasks[i:i+max_concurrency]
+            batch_results = await asyncio.gather(*batch)
+            results.extend(batch_results)
+    
+    # Convert to DataFrame
+    df = pd.DataFrame(results)
+    
+    return df
+
+
+def batch_summary_evaluation_extended(
+    summary_pairs: Sequence[Dict[str, str]],
+    gold_key: str = "gold_summary",
+    pred_key: str = "pred_summary",
+    id_key: Optional[str] = None,
+    metadata_keys: Optional[List[str]] = None,
+    max_concurrency: int = 5,
+    show_progress: bool = True,
+) -> pd.DataFrame:
+    """
+    Synchronous wrapper for batch_evaluate_summaries_extended.
+    
+    Args:
+        summary_pairs: A sequence of dictionaries containing gold and predicted summaries
+        gold_key: The key for the gold summary (default: "gold_summary")
+        pred_key: The key for the predicted summary (default: "pred_summary")
+        id_key: Optional key to use as an identifier in the results
+        metadata_keys: Optional list of additional keys to include in results
+        max_concurrency: Maximum number of concurrent evaluations (default: 5)
+        show_progress: Whether to show a progress bar (default: True)
+    
+    Returns:
+        A pandas DataFrame containing evaluation results with precision and recall metrics
+    """
+    return asyncio.run(batch_evaluate_summaries_extended(
+        summary_pairs=summary_pairs,
+        gold_key=gold_key,
+        pred_key=pred_key,
+        id_key=id_key,
+        metadata_keys=metadata_keys,
+        max_concurrency=max_concurrency,
+        show_progress=show_progress,
+    ))
+
+
+def visualize_extended_evaluation_results(
+    df: pd.DataFrame,
+    output_dir: Optional[str] = None,
+    show_plots: bool = True,
+) -> Dict[str, str]:
+    """
+    Generate visualizations from extended evaluation results including precision and recall.
+    
+    Args:
+        df: DataFrame containing extended evaluation results
+        output_dir: Directory to save plots (if None, plots are not saved)
+        show_plots: Whether to display the plots (default: True)
+        
+    Returns:
+        Dictionary mapping plot names to their file paths (if saved)
+    """
+    # Set up plot style
+    sns.set(style="whitegrid")
+    plt.rcParams.update({'font.size': 12})
+    
+    # Create output directory if needed
+    if output_dir:
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
+    # Dictionary to store plot file paths
+    plot_paths = {}
+    
+    # Precision-Recall-F1 Plot
+    if all(col in df.columns for col in ["precision_score", "recall_score", "f1_score"]):
+        plt.figure(figsize=(10, 6))
+        
+        # Prepare data
+        metrics_data = df[["precision_score", "recall_score", "f1_score"]].mean().reset_index()
+        metrics_data.columns = ["Metric", "Value"]
+        
+        # Create bar plot
+        ax = sns.barplot(x="Metric", y="Value", data=metrics_data)
+        ax.set_title('Average Precision, Recall, and F1 Scores')
+        ax.set_ylim(0, 1)
+        
+        # Add value labels
+        for i, v in enumerate(metrics_data["Value"]):
+            ax.text(i, v + 0.02, f"{v:.3f}", ha='center')
+        
+        if output_dir:
+            path = f"{output_dir}/precision_recall_f1.png"
+            plt.savefig(path, dpi=300, bbox_inches='tight')
+            plot_paths['precision_recall_f1'] = path
+        
+        if show_plots:
+            plt.show()
+        else:
+            plt.close()
+    
+    # Scatter plot of Precision vs Recall
+    if all(col in df.columns for col in ["precision_score", "recall_score"]):
+        plt.figure(figsize=(10, 8))
+        
+        # Create scatter plot
+        ax = sns.scatterplot(
+            x="recall_score", 
+            y="precision_score", 
+            data=df,
+            alpha=0.7,
+            s=100
+        )
+        
+        # Add identity line
+        lims = [
+            np.min([ax.get_xlim(), ax.get_ylim()]),  # min of both axes
+            np.max([ax.get_xlim(), ax.get_ylim()]),  # max of both axes
+        ]
+        ax.plot(lims, lims, 'k--', alpha=0.3, zorder=0)
+        
+        # Add mean lines
+        plt.axvline(df["recall_score"].mean(), color='r', linestyle='--', alpha=0.3)
+        plt.axhline(df["precision_score"].mean(), color='r', linestyle='--', alpha=0.3)
+        
+        ax.set_title('Precision vs Recall for All Summaries')
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        
+        if output_dir:
+            path = f"{output_dir}/precision_vs_recall.png"
+            plt.savefig(path, dpi=300, bbox_inches='tight')
+            plot_paths['precision_vs_recall'] = path
+        
+        if show_plots:
+            plt.show()
+        else:
+            plt.close()
+            
     return plot_paths
